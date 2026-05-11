@@ -32,7 +32,8 @@ export default function AdminSidebar({ role }: Props) {
   }
 
   const visibleItems = NAV_ITEMS.filter((item) => {
-    if (item.kitchenOnly) return true
+    if (role === 'kitchen') return item.kitchenOnly === true
+    if (item.kitchenOnly) return false
     if (item.adminOnly) return role === 'admin'
     return true
   })

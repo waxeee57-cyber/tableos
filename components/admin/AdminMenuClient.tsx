@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { MenuCategory, MenuItem, PriceOption } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/format'
+import { ALLERGENS } from '@/lib/constants'
 import Link from 'next/link'
 
 function slugify(text: string): string {
@@ -274,12 +275,6 @@ function ItemModal({
   onSave: () => void
   onClose: () => void
 }) {
-  const ALLERGENS = [
-    { code: 'g', label: 'Glutén' }, { code: 'l', label: 'Laktóz' },
-    { code: 'n', label: 'Mogyoró' }, { code: 'e', label: 'Tojás' },
-    { code: 'f', label: 'Hal' }, { code: 's', label: 'Szója' },
-    { code: 'c', label: 'Zeller' }, { code: 'm', label: 'Mustár' },
-  ]
   const allergens = item.allergens ?? []
 
   return (
