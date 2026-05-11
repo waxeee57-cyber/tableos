@@ -1,0 +1,19 @@
+const store = new Map<string, number[]>()
+
+export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now()
+  const windowStart = now - windowMs
+  const timestamps = (store.get(key) ?? []).filter((t) => t > windowStart)
+
+  if (timestamps.length >= limit) return false
+
+  timestamps.push(now)
+  store.set(key, timestamps)
+  return true
+}
+
+export function getClientIP(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) return forwarded.split(',')[0].trim()
+  return 'unknown'
+}
