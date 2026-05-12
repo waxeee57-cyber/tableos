@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Hiányzó paraméterek.' }, { status: 400 })
   }
 
-  const session = getImportSession(session_id)
+  const session = await getImportSession(session_id)
   if (!session) {
     return NextResponse.json({ error: 'A munkamenet lejárt. Töltsd fel újra a fájlt.' }, { status: 404 })
   }

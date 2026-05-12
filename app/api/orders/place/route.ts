@@ -38,7 +38,7 @@ const PlaceOrderSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request)
-  if (!rateLimit(`order:${ip}`, 10, 60 * 60 * 1000)) {
+  if (!await rateLimit(`order:${ip}`, 10, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'Túl sok rendelés. Próbáld később.' }, { status: 429 })
   }
 
@@ -126,9 +126,8 @@ export async function POST(request: NextRequest) {
 
   if (existingCustomer) {
     customerId = existingCustomer.id
+    await adminClient().rpc('increment_customer_stats', { p_customer_id: customerId, p_order_total: total })
     await adminClient().from('customers').update({
-      order_count: (existingCustomer.order_count ?? 0) + 1,
-      total_spent: (existingCustomer.total_spent ?? 0) + total,
       last_order_at: now,
       preferred_payment_method: data.paymentMethod,
       updated_at: now,
@@ -150,10 +149,7 @@ export async function POST(request: NextRequest) {
     customerId = newCustomer?.id ?? null
   }
 
-  const orderNumber = generateOrderNumber(config.business_name)
-
-  const { data: order, error: orderErr } = await adminClient().from('orders').insert({
-    order_number: orderNumber,
+  const orderBase = {
     customer_id: customerId,
     order_type: data.orderType,
     status: 'new',
@@ -171,7 +167,20 @@ export async function POST(request: NextRequest) {
     customer_phone: data.customer.phone,
     customer_email: data.customer.email ?? null,
     customer_notes: data.notes ?? null,
-  }).select('*').single()
+  }
+
+  let order = null
+  let orderErr = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await adminClient()
+      .from('orders')
+      .insert({ ...orderBase, order_number: generateOrderNumber(config.business_name) })
+      .select('*')
+      .single()
+    order = result.data
+    orderErr = result.error
+    if (!result.error || result.error.code !== '23505') break
+  }
 
   if (orderErr || !order) {
     console.error('Order insert error:', orderErr)

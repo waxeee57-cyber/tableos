@@ -77,27 +77,11 @@ export async function PATCH(
     })
   }
 
-  // Roll back customer aggregates when an order is cancelled
+  // Roll back customer aggregates atomically when an order is cancelled
   if (newStatus === 'cancelled' && updated?.customer_id) {
-    Promise.resolve(
-      adminClient()
-        .from('customers')
-        .select('id, order_count, total_spent')
-        .eq('id', updated.customer_id)
-        .single()
-    )
-      .then(async ({ data: customer }) => {
-        if (!customer) return
-        await adminClient()
-          .from('customers')
-          .update({
-            order_count: Math.max(0, (customer.order_count ?? 0) - 1),
-            total_spent: Math.max(0, (customer.total_spent ?? 0) - order.total),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', customer.id)
-      })
-      .catch(console.error)
+    void adminClient()
+      .rpc('decrement_customer_stats', { p_customer_id: updated.customer_id, p_order_total: order.total })
+      .then(undefined, console.error)
   }
 
   return NextResponse.json({ order: updated })

@@ -4,7 +4,10 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
+
 function baseTemplate(content: string, config: Partial<BusinessConfig>): string {
+  const brandColor = HEX_COLOR_RE.test(config.primary_color ?? '') ? config.primary_color! : '#E85D04'
   return `<!DOCTYPE html>
 <html lang="hu">
 <head>
@@ -14,7 +17,7 @@ function baseTemplate(content: string, config: Partial<BusinessConfig>): string 
 <style>
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; color: #333; }
   .container { max-width: 600px; margin: 0 auto; background: #fff; }
-  .header { background: ${config.primary_color ?? '#E85D04'}; padding: 24px; text-align: center; }
+  .header { background: ${brandColor}; padding: 24px; text-align: center; }
   .header h1 { color: #fff; margin: 0; font-size: 24px; }
   .body { padding: 32px 24px; }
   .footer { background: #f5f5f5; padding: 16px 24px; text-align: center; font-size: 13px; color: #888; }
@@ -22,7 +25,7 @@ function baseTemplate(content: string, config: Partial<BusinessConfig>): string 
   th { text-align: left; padding: 8px; border-bottom: 2px solid #eee; font-size: 13px; color: #888; }
   td { padding: 8px; border-bottom: 1px solid #f0f0f0; }
   .total-row td { font-weight: bold; border-top: 2px solid #eee; border-bottom: none; }
-  .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; background: ${config.primary_color ?? '#E85D04'}; color: #fff; font-size: 14px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; background: ${brandColor}; color: #fff; font-size: 14px; }
 </style>
 </head>
 <body>

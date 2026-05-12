@@ -1,3 +1,5 @@
+import { adminClient } from '@/lib/supabase/admin'
+
 export interface ImportSession {
   columns: string[]
   rows: string[][]
@@ -5,30 +7,41 @@ export interface ImportSession {
   created_at: number
 }
 
-const sessions = new Map<string, ImportSession>()
+const SESSION_TTL_MS = 30 * 60 * 1000
 
-function cleanup() {
-  const now = Date.now()
-  for (const [id, session] of sessions) {
-    if (now - session.created_at > 60 * 60 * 1000) {
-      sessions.delete(id)
-    }
-  }
-}
+export async function createImportSession(
+  columns: string[],
+  rows: string[][],
+  total_rows: number
+): Promise<string> {
+  await adminClient()
+    .from('import_sessions')
+    .delete()
+    .lt('created_at', new Date(Date.now() - SESSION_TTL_MS).toISOString())
 
-export function createImportSession(columns: string[], rows: string[][], total_rows: number): string {
-  cleanup()
   const id = crypto.randomUUID()
-  sessions.set(id, { columns, rows, total_rows, created_at: Date.now() })
+  await adminClient()
+    .from('import_sessions')
+    .insert({ id, data: { columns, rows, total_rows }, created_at: new Date().toISOString() })
+
   return id
 }
 
-export function getImportSession(id: string): ImportSession | null {
-  const session = sessions.get(id)
-  if (!session) return null
-  if (Date.now() - session.created_at > 60 * 60 * 1000) {
-    sessions.delete(id)
-    return null
+export async function getImportSession(id: string): Promise<ImportSession | null> {
+  const { data } = await adminClient()
+    .from('import_sessions')
+    .select('data, created_at')
+    .eq('id', id)
+    .gt('created_at', new Date(Date.now() - SESSION_TTL_MS).toISOString())
+    .maybeSingle()
+
+  if (!data) return null
+
+  const d = data.data as { columns: string[]; rows: string[][]; total_rows: number }
+  return {
+    columns: d.columns,
+    rows: d.rows,
+    total_rows: d.total_rows,
+    created_at: new Date(data.created_at as string).getTime(),
   }
-  return session
 }

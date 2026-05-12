@@ -33,8 +33,14 @@ export async function GET(request: NextRequest) {
     .select('*', { count: 'exact' })
 
   if (q) {
+    const safeQ = q.replace(/[,%()]/g, '')
     query = query.or(
-      `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,address.ilike.%${q}%`
+      [
+        `name.ilike.%${safeQ}%`,
+        `phone.ilike.%${safeQ}%`,
+        `email.ilike.%${safeQ}%`,
+        `address.ilike.%${safeQ}%`,
+      ].join(',')
     )
   }
 
@@ -76,8 +82,14 @@ export async function GET(request: NextRequest) {
         .select(BASE_SELECT, { count: 'exact' })
 
       if (q) {
+        const safeQ = q.replace(/[,%()]/g, '')
         fallback = fallback.or(
-          `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,address.ilike.%${q}%`
+          [
+            `name.ilike.%${safeQ}%`,
+            `phone.ilike.%${safeQ}%`,
+            `email.ilike.%${safeQ}%`,
+            `address.ilike.%${safeQ}%`,
+          ].join(',')
         )
       }
       // Skip vip/active/dormant filters — all require new columns

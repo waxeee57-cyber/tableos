@@ -1,6 +1,7 @@
 # STATUS.md — Active Work Areas
 
-## Claude — fix/security-audit-p1
+## Claude — fix/security-audit-p2
 
-Security fixes from audit: price trust (place/route.ts), order items rollback, middleware.ts,
-email XSS escaping, role-based 403 on settings/export/delete.
+HIGH/MEDIUM security fixes: atomic customer stats RPC, Supabase-backed rate-limit +
+import-sessions, export pagination, filter injection, login rate limit,
+CSS injection guard, order-number retry, CSP header.

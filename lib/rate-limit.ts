@@ -1,20 +1,28 @@
-const store = new Map<string, number[]>()
+import { adminClient } from '@/lib/supabase/admin'
 
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+export async function rateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const { data } = await adminClient()
+    .from('rate_limits')
+    .select('attempts, window_start')
+    .eq('key', key)
+    .maybeSingle()
+
   const now = Date.now()
-  const windowStart = now - windowMs
-  const timestamps = (store.get(key) ?? []).filter((t) => t > windowStart)
+  const windowExpired = !data || new Date(data.window_start as string).getTime() < now - windowMs
 
-  if (timestamps.length >= limit) return false
+  if (!windowExpired && (data?.attempts ?? 0) >= limit) {
+    return false
+  }
 
-  timestamps.push(now)
-  store.set(key, timestamps)
-
-  // Prune keys with no recent activity to prevent unbounded memory growth
-  if (store.size > 10_000) {
-    for (const [k, ts] of store) {
-      if (ts.every((t) => t <= windowStart)) store.delete(k)
-    }
+  if (windowExpired) {
+    await adminClient()
+      .from('rate_limits')
+      .upsert({ key, attempts: 1, window_start: new Date(now).toISOString() }, { onConflict: 'key' })
+  } else {
+    await adminClient()
+      .from('rate_limits')
+      .update({ attempts: (data?.attempts ?? 0) + 1 })
+      .eq('key', key)
   }
 
   return true

@@ -215,33 +215,17 @@ export async function POST(request: NextRequest) {
     console.error('[Phone order] Items insert error:', itemsErr)
   }
 
-  // Update customer aggregates (fire-and-forget)
+  // Update customer aggregates atomically (fire-and-forget)
   if (customerId) {
     const cid = customerId
-    Promise.resolve(
-      adminClient()
-        .from('customers')
-        .select('order_count, total_spent')
-        .eq('id', cid)
-        .single()
-    )
-      .then(async ({ data: cust }) => {
-        if (!cust) return
-        const baseUpdate = {
-          order_count: ((cust.order_count as number) ?? 0) + 1,
-          total_spent: ((cust.total_spent as number) ?? 0) + total,
-          updated_at: now,
-        }
-        const { error: updateErr } = await adminClient()
-          .from('customers')
-          .update({ ...baseUpdate, last_order_at: now, preferred_payment_method: input.payment_method })
-          .eq('id', cid)
-        // Migration 04 not applied — retry with base columns only
-        if (isSchemaCacheError(updateErr)) {
-          await adminClient().from('customers').update(baseUpdate).eq('id', cid)
-        }
-      })
-      .catch(console.error)
+    void adminClient()
+      .rpc('increment_customer_stats', { p_customer_id: cid, p_order_total: total })
+      .then(undefined, console.error)
+    void adminClient()
+      .from('customers')
+      .update({ last_order_at: now, preferred_payment_method: input.payment_method, updated_at: now })
+      .eq('id', cid)
+      .then(undefined, console.error)
   }
 
   // Send confirmation email if customer provided email

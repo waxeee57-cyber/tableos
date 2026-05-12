@@ -1,10 +1,20 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function loginAction(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+
+  const hdrs = await headers()
+  const forwarded = hdrs.get('x-forwarded-for')
+  const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
+
+  if (!await rateLimit(`admin-login:${ip}`, 10, 15 * 60 * 1000)) {
+    return { error: 'Túl sok bejelentkezési kísérlet. Próbáld 15 perc múlva.' }
+  }
 
   console.log('[LOGIN-1] signInWithPassword starting for:', email)
 

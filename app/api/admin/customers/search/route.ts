@@ -14,19 +14,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ customers: [] })
   }
 
+  const safeQ = q.replace(/[,%()]/g, '')
   const digitsOnly = q.replace(/\D/g, '')
 
   // Build OR filter: always search by name; add phone and email conditionally
-  const filters: string[] = [`name.ilike.%${q}%`]
+  const filters: string[] = [`name.ilike.%${safeQ}%`]
 
-  if (q.includes('@')) {
-    filters.push(`email.ilike.%${q}%`)
+  if (safeQ.includes('@')) {
+    filters.push(`email.ilike.%${safeQ}%`)
   }
 
   if (digitsOnly.length >= 2) {
     filters.push(`phone.ilike.%${digitsOnly}%`)
     // also match raw input in case user typed "+36 30 1" with spaces
-    if (q !== digitsOnly) filters.push(`phone.ilike.%${q}%`)
+    if (safeQ !== digitsOnly) filters.push(`phone.ilike.%${safeQ}%`)
   }
 
   const { data, error } = await adminClient()
