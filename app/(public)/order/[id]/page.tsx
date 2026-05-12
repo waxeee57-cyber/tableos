@@ -22,6 +22,7 @@ export default async function OrderPage({ params }: Props) {
       order={orderRes.data as Order}
       items={(itemsRes.data ?? []) as OrderItem[]}
       config={config as BusinessConfig}
+      estimatedMinutes={config?.estimated_delivery_minutes}
     />
   )
 }

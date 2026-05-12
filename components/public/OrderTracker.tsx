@@ -22,9 +22,10 @@ interface Props {
   order: Order
   items: OrderItem[]
   config: BusinessConfig
+  estimatedMinutes?: number
 }
 
-export default function OrderTracker({ order: initialOrder, items, config }: Props) {
+export default function OrderTracker({ order: initialOrder, items, config, estimatedMinutes }: Props) {
   const [order, setOrder] = useState(initialOrder)
 
   useEffect(() => {
@@ -72,6 +73,12 @@ export default function OrderTracker({ order: initialOrder, items, config }: Pro
               {STATUS_LABELS[order.status] ?? order.status}
             </span>
           </div>
+
+          {(order.status === 'accepted' || order.status === 'preparing') && estimatedMinutes && (
+            <p className="text-sm text-gray-600 mt-2">
+              Becsült idő: ~{estimatedMinutes} perc
+            </p>
+          )}
 
           {/* Progress bar */}
           {!isCancelled && (

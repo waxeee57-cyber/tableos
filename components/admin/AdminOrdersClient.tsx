@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import type { Order, BusinessConfig, OrderStatus } from '@/types'
 import { formatPrice, timeAgo } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
+import { printOrder } from '@/lib/print'
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'new', label: 'Új' },
@@ -50,6 +51,13 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
   const currency = config.currency ?? 'HUF'
   const symbol = config.currency_symbol ?? 'Ft'
 
+  // Push notification permission request on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
   const fetchOrders = useCallback(async () => {
     const res = await fetch('/api/admin/orders?limit=100')
     if (res.ok) {
@@ -58,23 +66,25 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
     }
   }, [])
 
+  // Realtime: INSERT fires notification; UPDATE just refreshes list
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel('admin-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         fetchOrders()
-        // Play notification sound for new orders
-        if (typeof window !== 'undefined') {
-          try {
-            const ctx = new AudioContext()
-            const osc = ctx.createOscillator()
-            osc.connect(ctx.destination)
-            osc.frequency.value = 880
-            osc.start()
-            osc.stop(ctx.currentTime + 0.15)
-          } catch {}
+        if ('Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
+          const newOrder = payload.new as Partial<Order>
+          new Notification('🍕 Új rendelés!', {
+            body: `#${newOrder.order_number ?? ''} — azonnali elfogadás szükséges`,
+            icon: '/favicon.ico',
+            tag: 'new-order',
+            requireInteraction: true,
+          })
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+        fetchOrders()
       })
       .subscribe()
 
@@ -165,7 +175,7 @@ function OrderCard({
 }) {
   const nextStatuses = NEXT_STATUS[order.status] ?? []
   const typeLabel = order.order_type === 'delivery' ? '🚴 Kiszállítás' : order.order_type === 'takeaway' ? '🛍️ Elvitel' : '🍽️ Helyi'
-  const payLabel = { cash: 'Készpénz', card: 'Kártya', szep_card: 'SZÉP', card_online: 'Online' }
+  const payLabel: Record<string, string> = { cash: 'Készpénz', card: 'Kártya', szep_card: 'SZÉP', card_online: 'Online' }
 
   return (
     <div className="bg-white rounded-xl border p-4 shadow-sm">
@@ -212,6 +222,13 @@ function OrderCard({
         </span>
 
         <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => printOrder(order)}
+            className="text-sm px-3 py-1.5 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            title="Nyomtatás"
+          >
+            🖨 Nyomtat
+          </button>
           {nextStatuses.map(({ label, status }) => (
             <button
               key={status}

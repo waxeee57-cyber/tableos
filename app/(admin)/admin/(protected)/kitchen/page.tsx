@@ -7,7 +7,7 @@ export const revalidate = 0
 
 export default async function KitchenPage() {
   const [ordersRes, config] = await Promise.all([
-    adminClient().from('orders').select('*, order_items(*)').in('status', ['accepted', 'preparing', 'ready']).order('placed_at', { ascending: true }),
+    adminClient().from('orders').select('*, order_items(*)').in('status', ['new', 'accepted', 'preparing', 'ready']).order('placed_at', { ascending: true }),
     getBusinessConfig(),
   ])
 

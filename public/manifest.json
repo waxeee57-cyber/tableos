@@ -1,0 +1,11 @@
+{
+  "name": "TableOS Admin",
+  "short_name": "TableOS",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E85D04",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}
