@@ -7,30 +7,45 @@ export async function GET(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(request.url)
-  const phoneQuery = url.searchParams.get('phone') ?? ''
+  // ?q= is the new param; ?phone= is kept for backward compat
+  const q = url.searchParams.get('q') ?? url.searchParams.get('phone') ?? ''
 
-  const digitsOnly = phoneQuery.replace(/\D/g, '')
-  if (digitsOnly.length < 3) {
+  if (q.length < 2) {
     return NextResponse.json({ customers: [] })
+  }
+
+  const digitsOnly = q.replace(/\D/g, '')
+
+  // Build OR filter: always search by name; add phone and email conditionally
+  const filters: string[] = [`name.ilike.%${q}%`]
+
+  if (q.includes('@')) {
+    filters.push(`email.ilike.%${q}%`)
+  }
+
+  if (digitsOnly.length >= 2) {
+    filters.push(`phone.ilike.%${digitsOnly}%`)
+    // also match raw input in case user typed "+36 30 1" with spaces
+    if (q !== digitsOnly) filters.push(`phone.ilike.%${q}%`)
   }
 
   const { data, error } = await adminClient()
     .from('customers')
     .select(
-      'id, name, phone, email, address, city, postal_code, order_count, total_spent, last_order_at, is_vip, preferred_payment_method, notes'
+      'id, name, phone, email, address, city, order_count, total_spent, last_order_at, is_vip, preferred_payment_method, notes'
     )
-    .or(`phone.ilike.%${digitsOnly}%`)
+    .or(filters.join(','))
     .order('last_order_at', { ascending: false, nullsFirst: false })
-    .limit(5)
+    .limit(8)
 
   // Migration 04 not yet applied — retry with base columns only
   if (error && (error.code === 'PGRST204' || error.message?.includes('schema cache'))) {
     const { data: minimal } = await adminClient()
       .from('customers')
-      .select('id, name, phone, email, address, city, postal_code, order_count, total_spent, notes')
-      .or(`phone.ilike.%${digitsOnly}%`)
+      .select('id, name, phone, email, address, city, order_count, total_spent, notes')
+      .or(filters.join(','))
       .order('created_at', { ascending: false })
-      .limit(5)
+      .limit(8)
     return NextResponse.json({ customers: minimal ?? [] })
   }
 

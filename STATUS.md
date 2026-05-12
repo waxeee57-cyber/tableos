@@ -16,3 +16,7 @@
 - `app/(admin)/admin/(protected)/page.tsx` (phone order stat)
 
 **Status:** In progress
+
+### Latest change (2026-05-12)
+Two-stage customer selection UX for phone order entry.
+Files: `AdminNewOrderClient.tsx`, `search/route.ts`
