@@ -65,7 +65,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Az étterem jelenleg zárva van.' }, { status: 400 })
   }
 
-  const subtotal = data.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+  // Fetch actual prices from DB — never trust client-submitted unitPrice
+  const menuItemIds = [...new Set(data.items.map((i) => i.menuItemId))]
+  const { data: menuRows, error: menuFetchErr } = await adminClient()
+    .from('menu_items')
+    .select('id, prices, is_available, is_visible')
+    .in('id', menuItemIds)
+
+  if (menuFetchErr || !menuRows) {
+    return NextResponse.json({ error: 'Szerver hiba.' }, { status: 500 })
+  }
+
+  const menuMap = new Map(
+    menuRows.map((m) => [
+      m.id as string,
+      m as { id: string; prices: { size: string | null; price: number }[]; is_available: boolean; is_visible: boolean },
+    ])
+  )
+
+  for (const item of data.items) {
+    const menuItem = menuMap.get(item.menuItemId)
+    if (!menuItem || !menuItem.is_available || !menuItem.is_visible) {
+      return NextResponse.json({ error: 'Érvénytelen vagy nem elérhető termék.' }, { status: 400 })
+    }
+    const priceOption = menuItem.prices.find((p) => p.size === (item.size ?? null))
+    if (!priceOption) {
+      return NextResponse.json({ error: 'Érvénytelen termékméret.' }, { status: 400 })
+    }
+  }
+
+  const subtotal = data.items.reduce((s, i) => {
+    const priceOption = menuMap.get(i.menuItemId)!.prices.find((p) => p.size === (i.size ?? null))!
+    return s + priceOption.price * i.quantity
+  }, 0)
   if (data.orderType === 'delivery' && config.min_order_amount > 0 && subtotal < config.min_order_amount) {
     return NextResponse.json({
       error: `Minimum rendelési összeg kiszállításhoz: ${config.min_order_amount} ${config.currency_symbol}`,
@@ -146,17 +178,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Nem sikerült a rendelést menteni.' }, { status: 500 })
   }
 
-  const orderItems = data.items.map((i) => ({
-    order_id: order.id,
-    menu_item_id: i.menuItemId,
-    item_name: i.name,
-    item_size: i.size ?? null,
-    quantity: i.quantity,
-    unit_price: i.unitPrice,
-    total_price: i.unitPrice * i.quantity,
-  }))
+  const orderItems = data.items.map((i) => {
+    const dbPrice = menuMap.get(i.menuItemId)!.prices.find((p) => p.size === (i.size ?? null))!.price
+    return {
+      order_id: order.id,
+      menu_item_id: i.menuItemId,
+      item_name: i.name,
+      item_size: i.size ?? null,
+      quantity: i.quantity,
+      unit_price: dbPrice,
+      total_price: dbPrice * i.quantity,
+    }
+  })
 
-  await adminClient().from('order_items').insert(orderItems)
+  const { error: itemsErr } = await adminClient().from('order_items').insert(orderItems)
+  if (itemsErr) {
+    await adminClient().from('orders').delete().eq('id', order.id)
+    return NextResponse.json({ error: 'Nem sikerült a rendelési tételeket menteni.' }, { status: 500 })
+  }
 
   const { data: createdItems } = await adminClient().from('order_items').select('*').eq('order_id', order.id)
 

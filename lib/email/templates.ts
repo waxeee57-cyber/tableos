@@ -1,5 +1,9 @@
 import type { Order, OrderItem, BusinessConfig } from '@/types'
 
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 function baseTemplate(content: string, config: Partial<BusinessConfig>): string {
   return `<!DOCTYPE html>
 <html lang="hu">
@@ -40,7 +44,7 @@ function itemsTable(items: OrderItem[], deliveryFee: number, total: number, curr
 
   const rows = items.map(i => `
     <tr>
-      <td>${i.item_name}${i.item_size ? ` (${i.item_size})` : ''}</td>
+      <td>${esc(i.item_name)}${i.item_size ? ` (${esc(i.item_size)})` : ''}</td>
       <td style="text-align:center">${i.quantity}</td>
       <td style="text-align:right">${fmt(i.total_price)}</td>
     </tr>`).join('')
@@ -72,7 +76,7 @@ export function orderConfirmationEmail(
     ${itemsTable(items, order.delivery_fee, order.total, config.currency, config.currency_symbol)}
     ${order.order_type === 'delivery' ? `
     <p><strong>Kiszállítási cím:</strong><br>
-    ${order.delivery_address}, ${order.delivery_city}</p>
+    ${esc(order.delivery_address ?? '')}, ${esc(order.delivery_city ?? '')}</p>
     <p><strong>Becsült kiszállítás:</strong> ~${config.estimated_delivery_minutes} perc</p>` : ''}
     <p style="margin-top:24px">
       <a href="${trackingUrl}" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
@@ -97,10 +101,10 @@ export function newOrderAdminEmail(
     <h2>Új rendelés érkezett!</h2>
     <p>Rendelésszám: <span class="badge">#${order.order_number}</span></p>
     <p><strong>Típus:</strong> ${typeLabel} · <strong>Fizetés:</strong> ${order.payment_method}</p>
-    <p><strong>Ügyfél:</strong> ${order.customer_name} · ${order.customer_phone}
-    ${order.customer_email ? ` · ${order.customer_email}` : ''}</p>
-    ${order.order_type === 'delivery' ? `<p><strong>Cím:</strong> ${order.delivery_address}, ${order.delivery_city}</p>` : ''}
-    ${order.customer_notes ? `<p><strong>Megjegyzés:</strong> ${order.customer_notes}</p>` : ''}
+    <p><strong>Ügyfél:</strong> ${esc(order.customer_name)} · ${esc(order.customer_phone)}
+    ${order.customer_email ? ` · ${esc(order.customer_email)}` : ''}</p>
+    ${order.order_type === 'delivery' ? `<p><strong>Cím:</strong> ${esc(order.delivery_address ?? '')}, ${esc(order.delivery_city ?? '')}</p>` : ''}
+    ${order.customer_notes ? `<p><strong>Megjegyzés:</strong> ${esc(order.customer_notes)}</p>` : ''}
     ${itemsTable(items, order.delivery_fee, order.total, config.currency, config.currency_symbol)}
     <p style="margin-top:24px">
       <a href="${adminUrl}" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">

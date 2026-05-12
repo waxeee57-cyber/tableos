@@ -1,3 +1,6 @@
 # STATUS.md — Active Work Areas
 
-_No active work in progress._
+## Claude — fix/security-audit-p1
+
+Security fixes from audit: price trust (place/route.ts), order items rollback, middleware.ts,
+email XSS escaping, role-based 403 on settings/export/delete.
