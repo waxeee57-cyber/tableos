@@ -156,6 +156,7 @@ export interface Order {
   customer_email: string | null
   customer_notes: string | null
   admin_notes: string | null
+  source: 'online' | 'phone' | 'walk_in' | 'admin'
   placed_at: string
   accepted_at: string | null
   preparing_at: string | null
