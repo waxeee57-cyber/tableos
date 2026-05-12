@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Bricolage_Grotesque, Onest } from 'next/font/google'
+import { Bricolage_Grotesque, Onest, Caveat } from 'next/font/google'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({
@@ -14,6 +14,12 @@ const onest = Onest({
   weight: ['400', '500', '600', '700'],
 })
 
+const caveat = Caveat({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-caveat',
+  weight: ['400', '700'],
+})
+
 export const metadata: Metadata = {
   title: 'TableOS',
   description: 'Restaurant ordering and management',
@@ -22,7 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="hu" className={`${bricolage.variable} ${onest.variable}`}>
+    <html lang="hu" className={`${bricolage.variable} ${onest.variable} ${caveat.variable}`}>
       <body className="font-sans antialiased min-h-full">{children}</body>
     </html>
   )
