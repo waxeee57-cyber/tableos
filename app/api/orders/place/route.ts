@@ -90,12 +90,16 @@ export async function POST(request: NextRequest) {
   let customerId: string | null = null
   const { data: existingCustomer } = await adminClient().from('customers').select('id, order_count, total_spent').eq('phone', data.customer.phone).single()
 
+  const now = new Date().toISOString()
+
   if (existingCustomer) {
     customerId = existingCustomer.id
     await adminClient().from('customers').update({
       order_count: (existingCustomer.order_count ?? 0) + 1,
       total_spent: (existingCustomer.total_spent ?? 0) + total,
-      updated_at: new Date().toISOString(),
+      last_order_at: now,
+      preferred_payment_method: data.paymentMethod,
+      updated_at: now,
     }).eq('id', customerId)
   } else {
     const { data: newCustomer } = await adminClient().from('customers').insert({
@@ -107,6 +111,9 @@ export async function POST(request: NextRequest) {
       postal_code: data.delivery?.postalCode ?? null,
       order_count: 1,
       total_spent: total,
+      last_order_at: now,
+      preferred_payment_method: data.paymentMethod,
+      source: 'online',
     }).select('id').single()
     customerId = newCustomer?.id ?? null
   }

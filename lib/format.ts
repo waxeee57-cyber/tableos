@@ -36,5 +36,11 @@ export function timeAgo(date: string | Date): string {
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} perce`
   const hours = Math.floor(minutes / 60)
-  return `${hours} órája`
+  if (hours < 24) return `${hours} órája`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} napja`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} hónapja`
+  const years = Math.floor(months / 12)
+  return `${years} éve`
 }

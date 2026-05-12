@@ -76,6 +76,29 @@ export interface Customer {
   notes: string | null
   order_count: number
   total_spent: number
+  is_vip: boolean
+  last_order_at: string | null
+  preferred_payment_method: string | null
+  source: 'online' | 'imported' | 'manual' | 'phone'
+  imported_at: string | null
+  import_batch_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerImport {
+  id: string
+  filename: string | null
+  total_rows: number
+  imported_count: number
+  duplicates_count: number
+  errors_count: number
+  status: 'pending' | 'preview' | 'completed' | 'failed' | 'rolled_back'
+  duplicate_decisions: Record<string, string>
+  error_log: Array<{ row_index: number; reason: string }>
+  created_by: string | null
+  created_at: string
+  completed_at: string | null
 }
 
 export interface OrderItem {

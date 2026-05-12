@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: '◼', exact: true },
   { href: '/admin/menu', label: 'Étlap', icon: '☰' },
   { href: '/admin/orders', label: 'Rendelések', icon: '🛒' },
+  { href: '/admin/customers', label: 'Vendégek', icon: '👥' },
   { href: '/admin/kitchen', label: 'Konyha', icon: '🍳', kitchenOnly: true },
   { href: '/admin/settings', label: 'Beállítások', icon: '⚙', adminOnly: true },
 ]

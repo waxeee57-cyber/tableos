@@ -3,6 +3,7 @@ import { getBusinessConfig } from '@/lib/config'
 import { formatPrice } from '@/lib/format'
 import type { Order } from '@/types'
 import AdminDashboardClient from '@/components/admin/AdminDashboardClient'
+import Link from 'next/link'
 
 export const revalidate = 30
 
@@ -10,9 +11,17 @@ async function getDashboardData() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [ordersRes, configRes] = await Promise.all([
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const [ordersRes, configRes, customersRes] = await Promise.all([
     adminClient().from('orders').select('*, order_items(*)').gte('placed_at', today.toISOString()).order('placed_at', { ascending: false }),
     getBusinessConfig(),
+    Promise.all([
+      adminClient().from('customers').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+      adminClient().from('customers').select('*', { count: 'exact', head: true }).gte('last_order_at', thirtyDaysAgo.toISOString()),
+      adminClient().from('customers').select('*', { count: 'exact', head: true }).eq('is_vip', true),
+      adminClient().from('customers').select('*', { count: 'exact', head: true }),
+    ]),
   ])
 
   const orders = (ordersRes.data ?? []) as Order[]
@@ -36,11 +45,19 @@ async function getDashboardData() {
     if (count > topCount) { topItem = name; topCount = count }
   }
 
-  return { orders, revenue, completedCount: completedOrders.length, activeCount: activeOrders.length, topItem, config: configRes }
+  const [newTodayRes, activeCustomersRes, vipRes, totalRes] = customersRes
+  const customerStats = {
+    newToday: newTodayRes.count ?? 0,
+    active: activeCustomersRes.count ?? 0,
+    vip: vipRes.count ?? 0,
+    total: totalRes.count ?? 0,
+  }
+
+  return { orders, revenue, completedCount: completedOrders.length, activeCount: activeOrders.length, topItem, config: configRes, customerStats }
 }
 
 export default async function DashboardPage() {
-  const { orders, revenue, completedCount, activeCount, topItem, config } = await getDashboardData()
+  const { orders, revenue, completedCount, activeCount, topItem, config, customerStats } = await getDashboardData()
   const currency = config?.currency ?? 'HUF'
   const symbol = config?.currency_symbol ?? 'Ft'
 
@@ -56,11 +73,37 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Mai rendelések" value={orders.length} icon="📋" />
         <StatCard label="Aktív" value={activeCount} icon="🔥" highlight={activeCount > 0} />
         <StatCard label="Teljesített" value={completedCount} icon="✓" />
         <StatCard label="Mai bevétel" value={formatPrice(revenue, currency, symbol)} icon="💰" />
+      </div>
+
+      {/* Customer stats */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold text-gray-700">Vendégek</h2>
+          <Link href="/admin/customers" className="text-xs text-orange-500 hover:underline">Összes →</Link>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Link href="/admin/customers" className="bg-white rounded-xl border p-3 hover:border-orange-200 transition-colors">
+            <p className="text-2xl font-bold text-gray-900">{customerStats.newToday}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Új ma</p>
+          </Link>
+          <Link href="/admin/customers?filter=active" className="bg-white rounded-xl border p-3 hover:border-orange-200 transition-colors">
+            <p className="text-2xl font-bold text-gray-900">{customerStats.active}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Aktív (30 nap)</p>
+          </Link>
+          <Link href="/admin/customers?filter=vip" className="bg-white rounded-xl border p-3 hover:border-orange-200 transition-colors">
+            <p className="text-2xl font-bold text-gray-900">{customerStats.vip}</p>
+            <p className="text-xs text-gray-400 mt-0.5">VIP ⭐</p>
+          </Link>
+          <Link href="/admin/customers" className="bg-white rounded-xl border p-3 hover:border-orange-200 transition-colors">
+            <p className="text-2xl font-bold text-gray-900">{customerStats.total}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Összesen</p>
+          </Link>
+        </div>
       </div>
 
       {/* Active orders */}
