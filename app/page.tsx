@@ -6,3 +6,4 @@ export default function HomePage() {
   if (tenant === 'zoldfeszek') return <ZoldfeszekHome />
   return <TableOSHome />
 }
+
