@@ -14,17 +14,22 @@ export async function requireAdmin() {
   const supabase = await createClient()
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser()
+
+  console.log('[REQADMIN-1] getUser:', user?.id ?? 'null', userError?.message ?? 'no-error')
 
   if (!user) {
     redirect('/admin/login')
   }
 
-  const { data: adminUser } = await supabase
+  const { data: adminUser, error: adminError } = await supabase
     .from('admin_users')
     .select('*')
     .eq('user_id', user.id)
     .single()
+
+  console.log('[REQADMIN-2] admin_users row:', adminUser?.id ?? 'null', adminError?.message ?? 'no-error', adminError?.code ?? '')
 
   if (!adminUser) {
     redirect('/admin/login')
