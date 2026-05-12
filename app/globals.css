@@ -44,7 +44,8 @@ html {
   --color-brand-700: #9a3d02;
   --color-muted:     #6b7280;
   --color-border:    #e5e7eb;
-  --font-display:    var(--font-inter, ui-sans-serif, system-ui, sans-serif);
+  --font-display:    var(--font-bricolage), "Bricolage Grotesque", sans-serif;
+  --font-sans:       var(--font-onest), "Onest", sans-serif;
 }
 
 /* TableOS orange accent */
