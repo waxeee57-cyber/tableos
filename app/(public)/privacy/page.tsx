@@ -6,7 +6,7 @@ export default async function PrivacyPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b px-4 py-4">
-        <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">← Vissza</Link>
+        <Link href="/menu" className="text-sm text-gray-500 hover:text-gray-900">← Vissza</Link>
       </header>
       <main className="max-w-2xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">Adatvédelmi Tájékoztató</h1>

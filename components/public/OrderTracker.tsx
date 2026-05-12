@@ -22,9 +22,10 @@ interface Props {
   order: Order
   items: OrderItem[]
   config: BusinessConfig
+  estimatedMinutes?: number
 }
 
-export default function OrderTracker({ order: initialOrder, items, config }: Props) {
+export default function OrderTracker({ order: initialOrder, items, config, estimatedMinutes }: Props) {
   const [order, setOrder] = useState(initialOrder)
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function OrderTracker({ order: initialOrder, items, config }: Pro
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">← {config.business_name}</Link>
+          <Link href="/menu" className="text-sm text-gray-500 hover:text-gray-900">← {config.business_name}</Link>
         </div>
       </header>
 
@@ -72,6 +73,12 @@ export default function OrderTracker({ order: initialOrder, items, config }: Pro
               {STATUS_LABELS[order.status] ?? order.status}
             </span>
           </div>
+
+          {(order.status === 'accepted' || order.status === 'preparing') && estimatedMinutes && (
+            <p className="text-sm text-gray-600 mt-2">
+              Becsült idő: ~{estimatedMinutes} perc
+            </p>
+          )}
 
           {/* Progress bar */}
           {!isCancelled && (

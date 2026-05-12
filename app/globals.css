@@ -30,3 +30,93 @@ html {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── TableOS design tokens ─────────────────────────── */
+@theme {
+  --color-brand:     #E85D04;
+  --color-brand-50:  #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #E85D04;
+  --color-brand-600: #c44d03;
+  --color-brand-700: #9a3d02;
+  --color-muted:     #6b7280;
+  --color-border:    #e5e7eb;
+  --font-display:    var(--font-inter, ui-sans-serif, system-ui, sans-serif);
+}
+
+/* TableOS orange accent */
+.text-brand  { color: #E85D04; }
+.bg-brand    { background-color: #E85D04; }
+.border-brand { border-color: #E85D04; }
+
+@media (hover: hover) {
+  .card-3d:hover {
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1),
+                0 8px 16px rgba(232,93,4,0.08);
+    border-color: rgba(232,93,4,0.3);
+  }
+  .btn-3d:hover {
+    box-shadow: 0 8px 24px rgba(232,93,4,0.25);
+  }
+  .btn-3d:active {
+    box-shadow: 0 2px 8px rgba(232,93,4,0.15);
+  }
+}
+
+/* ─── Hero section ───────────────────────────────────── */
+.hero-dark {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+}
+
+/* ─── Decorative scroll toast (aria-hidden) ──────────── */
+.hero-scroll-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* ─── Admin mock display ─────────────────────────────── */
+.admin-mock-tilt {
+  perspective: 1200px;
+}
+.admin-mock-tilt > * {
+  transform: rotateY(-6deg) rotateX(2deg);
+  transform-style: preserve-3d;
+}
+
+/* ─── Card stagger entrance ──────────────────────────── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.card-stagger {
+  animation: card-in 0.4s ease both;
+  animation-delay: calc(var(--stagger, 0) * 80ms);
+}
+
+/* ─── Pulse dot ──────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ─── FAQ accordion ──────────────────────────────────── */
+.faq-item > summary { list-style: none; cursor: pointer; }
+.faq-item > summary::-webkit-details-marker { display: none; }
+.faq-icon { transition: transform 0.2s ease; display: inline-block; }
+.faq-item[open] .faq-icon { transform: rotate(45deg); }
+.faq-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+.faq-item[open] .faq-body { grid-template-rows: 1fr; }
+.faq-body > div { overflow: hidden; }

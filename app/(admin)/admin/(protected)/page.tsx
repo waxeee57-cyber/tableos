@@ -16,16 +16,18 @@ async function getDashboardData() {
   ])
 
   const orders = (ordersRes.data ?? []) as Order[]
-  const completed = orders.filter((o) => !['cancelled', 'rejected'].includes(o.status))
-  const revenue = completed.reduce((s, o) => s + o.total, 0)
-  const avg = completed.length > 0 ? Math.round(revenue / completed.length) : 0
+  const completedOrders = orders.filter((o) => o.status === 'completed')
+  const revenue = completedOrders.reduce((s, o) => s + o.total, 0)
+  const activeOrders = orders.filter((o) =>
+    ['new', 'accepted', 'preparing', 'ready', 'delivering'].includes(o.status)
+  )
 
-  // Top item
+  // Top item across all non-cancelled orders
+  const nonCancelled = orders.filter((o) => !['cancelled', 'rejected'].includes(o.status))
   const itemCounts = new Map<string, number>()
-  for (const order of completed) {
+  for (const order of nonCancelled) {
     for (const item of order.order_items ?? []) {
-      const key = item.item_name
-      itemCounts.set(key, (itemCounts.get(key) ?? 0) + item.quantity)
+      itemCounts.set(item.item_name, (itemCounts.get(item.item_name) ?? 0) + item.quantity)
     }
   }
   let topItem = ''
@@ -34,11 +36,11 @@ async function getDashboardData() {
     if (count > topCount) { topItem = name; topCount = count }
   }
 
-  return { orders, revenue, avg, topItem, config: configRes }
+  return { orders, revenue, completedCount: completedOrders.length, activeCount: activeOrders.length, topItem, config: configRes }
 }
 
 export default async function DashboardPage() {
-  const { orders, revenue, avg, topItem, config } = await getDashboardData()
+  const { orders, revenue, completedCount, activeCount, topItem, config } = await getDashboardData()
   const currency = config?.currency ?? 'HUF'
   const symbol = config?.currency_symbol ?? 'Ft'
 
@@ -55,17 +57,10 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: 'Rendelések ma', value: orders.length.toString() },
-          { label: 'Bevétel ma', value: formatPrice(revenue, currency, symbol) },
-          { label: 'Átlagos rendelés', value: formatPrice(avg, currency, symbol) },
-          { label: 'Legkelendőbb', value: topItem || '—' },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-xl p-4 shadow-sm border">
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-            <p className="text-xl font-bold text-gray-900 mt-1 truncate">{value}</p>
-          </div>
-        ))}
+        <StatCard label="Mai rendelések" value={orders.length} icon="📋" />
+        <StatCard label="Aktív" value={activeCount} icon="🔥" highlight={activeCount > 0} />
+        <StatCard label="Teljesített" value={completedCount} icon="✓" />
+        <StatCard label="Mai bevétel" value={formatPrice(revenue, currency, symbol)} icon="💰" />
       </div>
 
       {/* Active orders */}
@@ -94,6 +89,23 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, icon, highlight }: {
+  label: string
+  value: string | number
+  icon: string
+  highlight?: boolean
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${highlight ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white'}`}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wide text-gray-500">{label}</span>
+        <span className="text-lg">{icon}</span>
+      </div>
+      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
     </div>
   )
 }
