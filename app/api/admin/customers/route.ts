@@ -14,6 +14,8 @@ const CreateCustomerSchema = z.object({
   is_vip: z.boolean().optional().default(false),
 })
 
+const BASE_SELECT = 'id, name, email, phone, address, city, postal_code, notes, order_count, total_spent, created_at, updated_at'
+
 export async function GET(request: NextRequest) {
   const auth = await requireAdminForAPI()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -67,6 +69,34 @@ export async function GET(request: NextRequest) {
   const { data, count, error } = await query
 
   if (error) {
+    // Migration 04 not yet applied — retry with base columns and safe sort
+    if (error.code === 'PGRST204' || error.message?.includes('schema cache')) {
+      let fallback = adminClient()
+        .from('customers')
+        .select(BASE_SELECT, { count: 'exact' })
+
+      if (q) {
+        fallback = fallback.or(
+          `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,address.ilike.%${q}%`
+        )
+      }
+      // Skip vip/active/dormant filters — all require new columns
+      const baseSortCol = (sort === 'recent' || sort === 'alphabetical')
+        ? (sort === 'alphabetical' ? 'name' : 'created_at')
+        : (sortMap[sort]?.col ?? 'created_at')
+      const baseSortAsc = sort === 'alphabetical' ? true : false
+      fallback = fallback.order(baseSortCol, { ascending: baseSortAsc })
+      fallback = fallback.range(offset, offset + limit - 1)
+
+      const { data: fd, count: fc, error: fe } = await fallback
+      if (fe) return NextResponse.json({ error: fe.message }, { status: 500 })
+      return NextResponse.json({
+        customers: fd,
+        total: fc ?? 0,
+        page,
+        totalPages: Math.ceil((fc ?? 0) / limit),
+      })
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
@@ -94,12 +124,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Érvénytelen adatok.', details: parsed.error.issues }, { status: 400 })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { is_vip: _is_vip, ...baseCustomerData } = parsed.data
+
   const { data, error } = await adminClient()
     .from('customers')
-    .insert({
-      ...parsed.data,
-      source: 'manual',
-    })
+    .insert({ ...parsed.data, source: 'manual' })
     .select('*')
     .single()
 
@@ -109,6 +139,24 @@ export async function POST(request: NextRequest) {
         { error: 'Egy vendég már létezik ezzel a telefonszámmal.' },
         { status: 409 }
       )
+    }
+    // Migration 04 not yet applied — retry without new columns
+    if (error.code === 'PGRST204' || error.message?.includes('schema cache')) {
+      const { data: retry, error: retryErr } = await adminClient()
+        .from('customers')
+        .insert(baseCustomerData)
+        .select('*')
+        .single()
+      if (retryErr) {
+        if (retryErr.code === '23505') {
+          return NextResponse.json(
+            { error: 'Egy vendég már létezik ezzel a telefonszámmal.' },
+            { status: 409 }
+          )
+        }
+        return NextResponse.json({ error: retryErr.message }, { status: 500 })
+      }
+      return NextResponse.json({ customer: retry }, { status: 201 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

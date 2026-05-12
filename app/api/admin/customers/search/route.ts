@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ customers: [] })
   }
 
-  const { data } = await adminClient()
+  const { data, error } = await adminClient()
     .from('customers')
     .select(
       'id, name, phone, email, address, city, postal_code, order_count, total_spent, last_order_at, is_vip, preferred_payment_method, notes'
@@ -22,6 +22,17 @@ export async function GET(request: NextRequest) {
     .or(`phone.ilike.%${digitsOnly}%`)
     .order('last_order_at', { ascending: false, nullsFirst: false })
     .limit(5)
+
+  // Migration 04 not yet applied — retry with base columns only
+  if (error && (error.code === 'PGRST204' || error.message?.includes('schema cache'))) {
+    const { data: minimal } = await adminClient()
+      .from('customers')
+      .select('id, name, phone, email, address, city, postal_code, order_count, total_spent, notes')
+      .or(`phone.ilike.%${digitsOnly}%`)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    return NextResponse.json({ customers: minimal ?? [] })
+  }
 
   return NextResponse.json({ customers: data ?? [] })
 }
