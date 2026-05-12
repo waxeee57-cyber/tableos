@@ -30,6 +30,7 @@ async function getDashboardData() {
   const activeOrders = orders.filter((o) =>
     ['new', 'accepted', 'preparing', 'ready', 'delivering'].includes(o.status)
   )
+  const phoneOrdersToday = orders.filter((o) => o.source === 'phone').length
 
   // Top item across all non-cancelled orders
   const nonCancelled = orders.filter((o) => !['cancelled', 'rejected'].includes(o.status))
@@ -53,11 +54,11 @@ async function getDashboardData() {
     total: totalRes.count ?? 0,
   }
 
-  return { orders, revenue, completedCount: completedOrders.length, activeCount: activeOrders.length, topItem, config: configRes, customerStats }
+  return { orders, revenue, completedCount: completedOrders.length, activeCount: activeOrders.length, topItem, config: configRes, customerStats, phoneOrdersToday }
 }
 
 export default async function DashboardPage() {
-  const { orders, revenue, completedCount, activeCount, topItem, config, customerStats } = await getDashboardData()
+  const { orders, revenue, completedCount, activeCount, topItem, config, customerStats, phoneOrdersToday } = await getDashboardData()
   const currency = config?.currency ?? 'HUF'
   const symbol = config?.currency_symbol ?? 'Ft'
 
@@ -73,10 +74,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard label="Mai rendelések" value={orders.length} icon="📋" />
         <StatCard label="Aktív" value={activeCount} icon="🔥" highlight={activeCount > 0} />
         <StatCard label="Teljesített" value={completedCount} icon="✓" />
+        <StatCard label="Telefonos ma" value={phoneOrdersToday} icon="📞" />
         <StatCard label="Mai bevétel" value={formatPrice(revenue, currency, symbol)} icon="💰" />
       </div>
 

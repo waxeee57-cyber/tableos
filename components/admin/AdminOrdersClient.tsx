@@ -1,10 +1,20 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import type { Order, BusinessConfig, OrderStatus } from '@/types'
 import { formatPrice, timeAgo } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
 import { printOrder } from '@/lib/print'
+
+const SOURCE_BADGE: Record<string, { label: string; cls: string } | null> = {
+  online: null,
+  phone: { label: 'Telefon', cls: 'bg-yellow-100 text-yellow-700' },
+  walk_in: { label: 'Helyben', cls: 'bg-gray-100 text-gray-600' },
+  admin: { label: 'Admin', cls: 'bg-gray-100 text-gray-600' },
+}
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'new', label: 'Új' },
@@ -47,9 +57,20 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [activeTab, setActiveTab] = useState('new')
   const [updating, setUpdating] = useState<string | null>(null)
+  const router = useRouter()
 
   const currency = config.currency ?? 'HUF'
   const symbol = config.currency_symbol ?? 'Ft'
+
+  // "N" key → new order (when not focused in an input)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'n' || e.key === 'N') router.push('/admin/orders/new')
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [router])
 
   // Push notification permission request on mount
   useEffect(() => {
@@ -115,7 +136,17 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24 lg:pb-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Rendelések</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Rendelések</h1>
+        <Link
+          href="/admin/orders/new"
+          className="flex items-center gap-2 min-h-[44px] px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors"
+          title="Új rendelés (N)"
+        >
+          <Plus className="w-4 h-4" />
+          Új rendelés
+        </Link>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-2 mb-4">
@@ -180,10 +211,15 @@ function OrderCard({
   return (
     <div className="bg-white rounded-xl border p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2 flex-wrap">
-        <div>
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="font-bold text-gray-900 text-lg">#{order.order_number}</span>
-          <span className="ml-2 text-sm text-gray-500">{typeLabel}</span>
-          <span className="ml-2 text-xs text-gray-400">{timeAgo(order.placed_at)}</span>
+          <span className="text-sm text-gray-500">{typeLabel}</span>
+          <span className="text-xs text-gray-400">{timeAgo(order.placed_at)}</span>
+          {order.source && SOURCE_BADGE[order.source] && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SOURCE_BADGE[order.source]!.cls}`}>
+              {SOURCE_BADGE[order.source]!.label}
+            </span>
+          )}
         </div>
         <StatusBadge status={order.status} />
       </div>

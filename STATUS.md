@@ -2,18 +2,17 @@
 
 ## Claude (AI assistant) — 2026-05-12
 
-**Branch:** `fix/csv-import-validation`
-**Task:** Full customer management system + CSV import wizard
+**Branch:** `feature/manual-phone-order`
+**Task:** Manual phone order entry for admin panel
 **Files/areas claimed:**
-- `types/index.ts` (Customer type extension)
-- `lib/phone.ts`, `lib/date-parse.ts`, `lib/import-sessions.ts`, `lib/format.ts`
-- `supabase/migrations/04_customers_enhancements.sql`
-- `app/api/admin/customers/**`
-- `app/(admin)/admin/(protected)/customers/**`
-- `components/admin/AdminCustomersClient.tsx`, `AdminCustomerDetailClient.tsx`
-- `components/admin/AdminSidebar.tsx` (add Customers nav item)
-- `app/(admin)/admin/(protected)/page.tsx` (add customer stats)
-- `app/api/orders/place/route.ts` (add last_order_at / source)
-- `app/api/admin/orders/[id]/status/route.ts` (cancellation aggregate rollback)
+- `types/index.ts` (source field on Order)
+- `supabase/migrations/05_orders_source.sql`
+- `app/api/admin/orders/new/route.ts`
+- `app/api/admin/customers/search/route.ts`
+- `app/(admin)/admin/(protected)/orders/new/page.tsx`
+- `components/admin/AdminNewOrderClient.tsx`
+- `components/admin/PrintReceipt.tsx`
+- `components/admin/AdminOrdersClient.tsx` (new order button + source badge + keyboard shortcut)
+- `app/(admin)/admin/(protected)/page.tsx` (phone order stat)
 
-**Status:** Complete — merged to feature branch, PR pending
+**Status:** In progress
