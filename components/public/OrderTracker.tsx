@@ -31,13 +31,17 @@ export default function OrderTracker({ order: initialOrder, items, config, estim
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
-      .channel('order-status')
+      .channel(`order-status-${order.id}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` },
         (payload) => setOrder(payload.new as Order)
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Order tracker: Realtime unavailable')
+        }
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [order.id])

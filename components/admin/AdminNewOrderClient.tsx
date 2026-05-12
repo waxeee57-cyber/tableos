@@ -69,6 +69,7 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Customer[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [newCustomerOpen, setNewCustomerOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
@@ -142,9 +143,14 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
         if (res.ok) {
           const data = await res.json()
           setSearchResults(data.customers ?? [])
+          setSearchError(null)
+        } else {
+          setSearchResults([])
+          setSearchError(res.status === 401 ? 'Hitelesítési hiba — frissítsd az oldalt.' : 'Keresési hiba. Próbáld újra.')
         }
       } catch {
-        // silent — network errors don't break the flow
+        setSearchResults([])
+        setSearchError('Hálózati hiba. Ellenőrizd a kapcsolatot.')
       } finally {
         setIsSearching(false)
       }
@@ -209,7 +215,7 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
   }
 
   function selectNewCustomer() {
-    if (!newName.trim() || !newPhone.trim()) return
+    if (!newName.trim() || newPhone.trim().length < 6) return
     const info: SelectedCustomerInfo = {
       id: null,
       name: newName.trim(),
@@ -367,6 +373,7 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
     setSearchQuery('')
     setSearchResults([])
     setIsSearching(false)
+    setSearchError(null)
     setNewCustomerOpen(false)
     setNewName('')
     setNewPhone('')
@@ -471,7 +478,11 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
             </div>
           )}
 
-          {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+          {searchError && (
+            <p className="text-sm text-red-500 text-center py-4">{searchError}</p>
+          )}
+
+          {searchQuery.length >= 2 && !isSearching && !searchError && searchResults.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-4">
               Nincs találat erre: „{searchQuery}"
             </p>
@@ -546,9 +557,12 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
                   className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
+              {newPhone.trim().length > 0 && newPhone.trim().length < 6 && (
+                <p className="text-xs text-red-500 -mb-1">A telefonszám legalább 6 karakterből áll.</p>
+              )}
               <button
                 onClick={selectNewCustomer}
-                disabled={!newName.trim() || !newPhone.trim()}
+                disabled={!newName.trim() || newPhone.trim().length < 6}
                 className="w-full min-h-[48px] bg-orange-500 text-white font-bold rounded-xl py-3 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm"
               >
                 Folytatás →
