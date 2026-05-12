@@ -53,7 +53,7 @@ export default function OrderTracker({ order: initialOrder, items, config }: Pro
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-900">← {config.business_name}</Link>
+          <Link href="/menu" className="text-sm text-gray-500 hover:text-gray-900">← {config.business_name}</Link>
         </div>
       </header>
 
