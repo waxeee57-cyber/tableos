@@ -1,32 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useTransition } from 'react'
+import { loginAction } from './actions'
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  async function handleLogin(e: React.FormEvent) {
+  function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
-    setLoading(true)
 
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const formData = new FormData(e.currentTarget)
+    startTransition(async () => {
+      const result = await loginAction(formData)
+      if (result?.error) {
+        setError(result.error)
+      }
     })
-
-    if (authError) {
-      setError('Hibás e-mail cím vagy jelszó.')
-      setLoading(false)
-      return
-    }
-
-    window.location.href = '/admin'
   }
 
   return (
@@ -42,8 +33,7 @@ export default function AdminLoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">E-mail cím</label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              name="email"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
               placeholder="admin@etterem.hu"
               required
@@ -54,8 +44,7 @@ export default function AdminLoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Jelszó</label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              name="password"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
               placeholder="••••••••"
               required
@@ -68,10 +57,10 @@ export default function AdminLoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isPending}
             className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-lg font-semibold text-sm disabled:opacity-60 transition-colors"
           >
-            {loading ? 'Belépés...' : 'Belépés'}
+            {isPending ? 'Belépés...' : 'Belépés'}
           </button>
         </form>
       </div>
