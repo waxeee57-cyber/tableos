@@ -24,11 +24,38 @@ function slugify(text: string): string {
 }
 
 function parseCSV(text: string): string[][] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, '')))
+  const rows: string[][] = []
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+
+  for (const line of lines) {
+    if (!line.trim()) continue
+
+    const cells: string[] = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          // Escaped quote inside a quoted field ("" → ")
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (ch === ',' && !inQuotes) {
+        cells.push(current.trim())
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+    cells.push(current.trim())
+    rows.push(cells)
+  }
+
+  return rows
 }
 
 export async function POST(request: NextRequest) {
