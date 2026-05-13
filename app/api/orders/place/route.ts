@@ -34,6 +34,11 @@ const PlaceOrderSchema = z.object({
       unitPrice: z.number().int().min(0),
     })
   ).min(1),
+  // Feature 1 — scheduled orders
+  is_scheduled: z.boolean().default(false),
+  scheduled_for: z.string().datetime().optional().nullable(),
+  // Feature 3 — reservation linkage
+  reservation_id: z.string().uuid().optional().nullable(),
 })
 
 export async function POST(request: NextRequest) {
@@ -61,7 +66,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Szerver hiba.' }, { status: 500 })
   }
 
-  if (!isOpen(config)) {
+  // Scheduling validation
+  if (data.is_scheduled) {
+    if (!data.scheduled_for) {
+      return NextResponse.json({ error: 'Scheduled time is required' }, { status: 400 })
+    }
+    if (new Date(data.scheduled_for) <= new Date()) {
+      return NextResponse.json({ error: 'Scheduled time must be in the future' }, { status: 400 })
+    }
+  }
+
+  const scheduledFor = data.is_scheduled ? (data.scheduled_for ?? null) : null
+
+  // Reservation validation
+  let reservationId: string | null = data.reservation_id ?? null
+  if (reservationId) {
+    const { data: reservation, error: resErr } = await adminClient()
+      .from('reservations')
+      .select('id, status, reservation_date, reservation_time')
+      .eq('id', reservationId)
+      .single()
+
+    if (resErr || !reservation) {
+      return NextResponse.json({ error: 'Reservation not found' }, { status: 400 })
+    }
+    if (reservation.status === 'cancelled') {
+      return NextResponse.json({ error: 'Cannot order for a cancelled reservation' }, { status: 400 })
+    }
+  }
+
+  // Only enforce isOpen check for non-scheduled, non-reservation ASAP orders
+  if (!data.is_scheduled && !reservationId && !isOpen(config)) {
     return NextResponse.json({ error: 'Az étterem jelenleg zárva van.' }, { status: 400 })
   }
 
@@ -139,10 +174,13 @@ export async function POST(request: NextRequest) {
     customer_phone: data.customer.phone,
     customer_email: data.customer.email ?? null,
     customer_notes: data.notes ?? null,
+    is_scheduled: data.is_scheduled,
+    scheduled_for: scheduledFor,
+    reservation_id: reservationId,
+    source: 'online',
   }).select('*').single()
 
   if (orderErr || !order) {
-    console.error('Order insert error:', orderErr)
     return NextResponse.json({ error: 'Nem sikerült a rendelést menteni.' }, { status: 500 })
   }
 

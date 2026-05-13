@@ -1,4 +1,8 @@
-import type { Order, OrderItem, BusinessConfig } from '@/types'
+import type { Order, OrderItem, BusinessConfig, Reservation } from '@/types'
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
 
 function baseTemplate(content: string, config: Partial<BusinessConfig>): string {
   return `<!DOCTYPE html>
@@ -6,7 +10,7 @@ function baseTemplate(content: string, config: Partial<BusinessConfig>): string 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${config.business_name ?? 'TableOS'}</title>
+<title>${esc(config.business_name ?? 'TableOS')}</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; color: #333; }
   .container { max-width: 600px; margin: 0 auto; background: #fff; }
@@ -23,10 +27,10 @@ function baseTemplate(content: string, config: Partial<BusinessConfig>): string 
 </head>
 <body>
 <div class="container">
-  <div class="header"><h1>${config.business_name ?? 'TableOS'}</h1></div>
+  <div class="header"><h1>${esc(config.business_name ?? 'TableOS')}</h1></div>
   <div class="body">${content}</div>
   <div class="footer">
-    ${config.business_name ?? 'TableOS'}${config.phone ? ` · ${config.phone}` : ''}
+    ${esc(config.business_name ?? 'TableOS')}${config.phone ? ` · ${esc(config.phone)}` : ''}
   </div>
 </div>
 </body>
@@ -35,12 +39,12 @@ function baseTemplate(content: string, config: Partial<BusinessConfig>): string 
 
 function itemsTable(items: OrderItem[], deliveryFee: number, total: number, currency: string, symbol: string): string {
   const fmt = (n: number) => currency === 'HUF'
-    ? `${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${symbol}`
-    : `${symbol}${(n / 100).toFixed(2)}`
+    ? `${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${esc(symbol)}`
+    : `${esc(symbol)}${(n / 100).toFixed(2)}`
 
   const rows = items.map(i => `
     <tr>
-      <td>${i.item_name}${i.item_size ? ` (${i.item_size})` : ''}</td>
+      <td>${esc(i.item_name)}${i.item_size ? ` (${esc(i.item_size)})` : ''}</td>
       <td style="text-align:center">${i.quantity}</td>
       <td style="text-align:right">${fmt(i.total_price)}</td>
     </tr>`).join('')
@@ -55,24 +59,36 @@ function itemsTable(items: OrderItem[], deliveryFee: number, total: number, curr
   </table>`
 }
 
+function formatScheduledFor(isoString: string, timezone: string): string {
+  const d = new Date(isoString)
+  const datePart = new Intl.DateTimeFormat('en-US', { timeZone: timezone, month: 'short', day: 'numeric' }).format(d)
+  const timePart = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
+  return `${datePart}, ${timePart}`
+}
+
 export function orderConfirmationEmail(
   order: Order,
   items: OrderItem[],
   config: BusinessConfig
 ): { subject: string; html: string } {
-  const subject = `Rendelésed megérkezett — #${order.order_number}`
+  const subject = `Rendelésed megérkezett — #${esc(order.order_number)}`
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
   const trackingUrl = `${siteUrl}/order/${order.id}`
   const typeLabel = order.order_type === 'delivery' ? 'Kiszállítás' : order.order_type === 'takeaway' ? 'Elvitel' : 'Helyi fogyasztás'
 
+  const scheduledLine = order.is_scheduled && order.scheduled_for
+    ? `<p><strong>Scheduled for:</strong> ${esc(formatScheduledFor(order.scheduled_for, config.timezone))}</p>`
+    : ''
+
   const content = `
     <h2>Köszönjük a rendelésed!</h2>
-    <p>Rendelésszám: <span class="badge">#${order.order_number}</span></p>
-    <p><strong>Típus:</strong> ${typeLabel}</p>
+    <p>Rendelésszám: <span class="badge">#${esc(order.order_number)}</span></p>
+    <p><strong>Típus:</strong> ${esc(typeLabel)}</p>
+    ${scheduledLine}
     ${itemsTable(items, order.delivery_fee, order.total, config.currency, config.currency_symbol)}
     ${order.order_type === 'delivery' ? `
     <p><strong>Kiszállítási cím:</strong><br>
-    ${order.delivery_address}, ${order.delivery_city}</p>
+    ${esc(order.delivery_address ?? '')}, ${esc(order.delivery_city ?? '')}</p>
     <p><strong>Becsült kiszállítás:</strong> ~${config.estimated_delivery_minutes} perc</p>` : ''}
     <p style="margin-top:24px">
       <a href="${trackingUrl}" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
@@ -88,19 +104,24 @@ export function newOrderAdminEmail(
   items: OrderItem[],
   config: BusinessConfig
 ): { subject: string; html: string } {
-  const subject = `Új rendelés — #${order.order_number} — ${order.total} ${config.currency_symbol}`
+  const subject = `Új rendelés — #${esc(order.order_number)} — ${order.total} ${esc(config.currency_symbol)}`
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
   const adminUrl = `${siteUrl}/admin/orders`
   const typeLabel = order.order_type === 'delivery' ? 'Kiszállítás' : order.order_type === 'takeaway' ? 'Elvitel' : 'Helyi fogyasztás'
 
+  const scheduledLine = order.is_scheduled && order.scheduled_for
+    ? `<p><strong>Scheduled for:</strong> ${esc(formatScheduledFor(order.scheduled_for, config.timezone))}</p>`
+    : ''
+
   const content = `
     <h2>Új rendelés érkezett!</h2>
-    <p>Rendelésszám: <span class="badge">#${order.order_number}</span></p>
-    <p><strong>Típus:</strong> ${typeLabel} · <strong>Fizetés:</strong> ${order.payment_method}</p>
-    <p><strong>Ügyfél:</strong> ${order.customer_name} · ${order.customer_phone}
-    ${order.customer_email ? ` · ${order.customer_email}` : ''}</p>
-    ${order.order_type === 'delivery' ? `<p><strong>Cím:</strong> ${order.delivery_address}, ${order.delivery_city}</p>` : ''}
-    ${order.customer_notes ? `<p><strong>Megjegyzés:</strong> ${order.customer_notes}</p>` : ''}
+    <p>Rendelésszám: <span class="badge">#${esc(order.order_number)}</span></p>
+    <p><strong>Típus:</strong> ${esc(typeLabel)} · <strong>Fizetés:</strong> ${esc(order.payment_method)}</p>
+    ${scheduledLine}
+    <p><strong>Ügyfél:</strong> ${esc(order.customer_name)} · ${esc(order.customer_phone)}
+    ${order.customer_email ? ` · ${esc(order.customer_email)}` : ''}</p>
+    ${order.order_type === 'delivery' ? `<p><strong>Cím:</strong> ${esc(order.delivery_address ?? '')}, ${esc(order.delivery_city ?? '')}</p>` : ''}
+    ${order.customer_notes ? `<p><strong>Megjegyzés:</strong> ${esc(order.customer_notes)}</p>` : ''}
     ${itemsTable(items, order.delivery_fee, order.total, config.currency, config.currency_symbol)}
     <p style="margin-top:24px">
       <a href="${adminUrl}" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
@@ -115,7 +136,7 @@ export function orderStatusUpdateEmail(
   order: Order,
   config: BusinessConfig
 ): { subject: string; html: string } {
-  const subject = `Rendelésed állapota frissült — #${order.order_number}`
+  const subject = `Rendelésed állapota frissült — #${esc(order.order_number)}`
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
   const trackingUrl = `${siteUrl}/order/${order.id}`
 
@@ -133,13 +154,91 @@ export function orderStatusUpdateEmail(
 
   const content = `
     <h2>Rendelésed állapota megváltozott</h2>
-    <p>Rendelésszám: <span class="badge">#${order.order_number}</span></p>
-    <p>Jelenlegi állapot: <strong>${label}</strong></p>
+    <p>Rendelésszám: <span class="badge">#${esc(order.order_number)}</span></p>
+    <p>Jelenlegi állapot: <strong>${esc(label)}</strong></p>
     <p style="margin-top:24px">
       <a href="${trackingUrl}" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
         Rendelés megtekintése →
       </a>
     </p>`
+
+  return { subject, html: baseTemplate(content, config) }
+}
+
+export function reservationConfirmationEmail(
+  reservation: Reservation,
+  config: BusinessConfig
+): { subject: string; html: string } {
+  const subject = `Foglalás visszaigazolás — ${esc(reservation.customer_name)}`
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+  const time = reservation.reservation_time.substring(0, 5)
+
+  const dateFormatted = new Intl.DateTimeFormat('hu-HU', {
+    timeZone: config.timezone,
+    year: 'numeric', month: 'long', day: 'numeric',
+  }).format(new Date(`${reservation.reservation_date}T${reservation.reservation_time}`))
+
+  const preOrderSection = config.dine_in_enabled
+    ? `<p style="margin-top:24px">Szeretne előre rendelni? <a href="${siteUrl}/reserve/${reservation.id}/order" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">Előrendelés →</a></p>`
+    : ''
+
+  const content = `
+    <h2>Köszönjük a foglalást!</h2>
+    <p><strong>Dátum:</strong> ${esc(dateFormatted)}</p>
+    <p><strong>Időpont:</strong> ${esc(time)}</p>
+    <p><strong>Személyek száma:</strong> ${reservation.party_size} fő</p>
+    ${reservation.notes ? `<p><strong>Megjegyzés:</strong> ${esc(reservation.notes)}</p>` : ''}
+    <p>Hamarosan visszaigazoljuk a foglalását.</p>
+    ${preOrderSection}`
+
+  return { subject, html: baseTemplate(content, config) }
+}
+
+export function newReservationAdminEmail(
+  reservation: Reservation,
+  config: BusinessConfig
+): { subject: string; html: string } {
+  const subject = `Új foglalás — ${esc(reservation.customer_name)} — ${reservation.reservation_date}`
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+  const adminUrl = `${siteUrl}/admin/reservations`
+  const time = reservation.reservation_time.substring(0, 5)
+
+  const content = `
+    <h2>Új foglalási igény érkezett!</h2>
+    <p><strong>Dátum:</strong> ${esc(reservation.reservation_date)}</p>
+    <p><strong>Időpont:</strong> ${esc(time)}</p>
+    <p><strong>Személyek száma:</strong> ${reservation.party_size} fő</p>
+    <p><strong>Vendég:</strong> ${esc(reservation.customer_name)} · ${esc(reservation.customer_phone)}${reservation.customer_email ? ` · ${esc(reservation.customer_email)}` : ''}</p>
+    ${reservation.notes ? `<p><strong>Megjegyzés:</strong> ${esc(reservation.notes)}</p>` : ''}
+    <p style="margin-top:24px">
+      <a href="${adminUrl}" style="background:${config.primary_color};color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
+        Admin panel →
+      </a>
+    </p>`
+
+  return { subject, html: baseTemplate(content, config) }
+}
+
+export function reservationStatusEmail(
+  reservation: Reservation,
+  config: BusinessConfig
+): { subject: string; html: string } {
+  const isConfirmed = reservation.status === 'confirmed'
+  const subject = isConfirmed
+    ? `Foglalás visszaigazolva — ${esc(reservation.customer_name)}`
+    : `Foglalás lemondva — ${esc(reservation.customer_name)}`
+
+  const time = reservation.reservation_time.substring(0, 5)
+
+  const content = `
+    <h2>${isConfirmed ? 'Foglalása visszaigazolva!' : 'Foglalása lemondva'}</h2>
+    <p><strong>Dátum:</strong> ${esc(reservation.reservation_date)}</p>
+    <p><strong>Időpont:</strong> ${esc(time)}</p>
+    <p><strong>Személyek száma:</strong> ${reservation.party_size} fő</p>
+    ${isConfirmed
+      ? `<p>Várjuk szeretettel!</p>`
+      : `<p>Sajnáljuk, hogy nem tud eljönni. Reméljük hamarosan viszontlátjuk!</p>`
+    }`
 
   return { subject, html: baseTemplate(content, config) }
 }

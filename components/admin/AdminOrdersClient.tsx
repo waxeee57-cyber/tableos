@@ -53,6 +53,13 @@ interface Props {
   config: BusinessConfig
 }
 
+function formatScheduledFor(isoString: string, tz: string): string {
+  const d = new Date(isoString)
+  const datePart = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short', day: 'numeric' }).format(d)
+  const timePart = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
+  return `${datePart}, ${timePart}`
+}
+
 export default function AdminOrdersClient({ initialOrders, config }: Props) {
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [activeTab, setActiveTab] = useState('new')
@@ -61,6 +68,7 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
 
   const currency = config.currency ?? 'HUF'
   const symbol = config.currency_symbol ?? 'Ft'
+  const tz = config.timezone ?? 'Europe/Budapest'
 
   // "N" key → new order (when not focused in an input)
   useEffect(() => {
@@ -135,9 +143,25 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
     }
   }
 
-  const filteredOrders = orders.filter((o) =>
+  const tabFiltered = orders.filter((o) =>
     activeTab === 'all' ? true : o.status === activeTab
   )
+
+  // Separate scheduled from ASAP, sort each group
+  const scheduledOrders = tabFiltered
+    .filter((o) => o.is_scheduled)
+    .sort((a, b) => {
+      const af = a.scheduled_for ?? ''
+      const bf = b.scheduled_for ?? ''
+      return af < bf ? -1 : af > bf ? 1 : 0
+    })
+
+  const asapOrders = tabFiltered
+    .filter((o) => !o.is_scheduled)
+    .sort((a, b) => (a.placed_at < b.placed_at ? 1 : a.placed_at > b.placed_at ? -1 : 0))
+
+  const hasScheduled = scheduledOrders.length > 0
+  const hasAsap = asapOrders.length > 0
 
   function countByStatus(status: string) {
     return orders.filter((o) => o.status === status).length
@@ -178,22 +202,57 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
       </div>
 
       {/* Orders */}
-      {filteredOrders.length === 0 ? (
+      {!hasScheduled && !hasAsap ? (
         <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
           Nincs rendelés ebben a kategóriában
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredOrders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              currency={currency}
-              symbol={symbol}
-              updating={updating === order.id}
-              onStatusChange={(status) => updateStatus(order.id, status)}
-            />
-          ))}
+        <div className="space-y-4">
+          {hasScheduled && (
+            <div>
+              {hasAsap && (
+                <h2 className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  📅 Előrendelt ({scheduledOrders.length})
+                </h2>
+              )}
+              <div className="space-y-3">
+                {scheduledOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    currency={currency}
+                    symbol={symbol}
+                    tz={tz}
+                    updating={updating === order.id}
+                    onStatusChange={(status) => updateStatus(order.id, status)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasAsap && (
+            <div>
+              {hasScheduled && (
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Azonnali rendelések ({asapOrders.length})
+                </h2>
+              )}
+              <div className="space-y-3">
+                {asapOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    currency={currency}
+                    symbol={symbol}
+                    tz={tz}
+                    updating={updating === order.id}
+                    onStatusChange={(status) => updateStatus(order.id, status)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -204,12 +263,14 @@ function OrderCard({
   order,
   currency,
   symbol,
+  tz,
   updating,
   onStatusChange,
 }: {
   order: Order
   currency: string
   symbol: string
+  tz: string
   updating: boolean
   onStatusChange: (status: OrderStatus) => void
 }) {
@@ -218,12 +279,17 @@ function OrderCard({
   const payLabel: Record<string, string> = { cash: 'Készpénz', card: 'Kártya', szep_card: 'SZÉP', card_online: 'Online' }
 
   return (
-    <div className="bg-white rounded-xl border p-4 shadow-sm">
+    <div className={`bg-white rounded-xl border p-4 shadow-sm ${order.is_scheduled ? 'border-purple-200 bg-purple-50/30' : ''}`}>
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-bold text-gray-900 text-lg">#{order.order_number}</span>
           <span className="text-sm text-gray-500">{typeLabel}</span>
           <span className="text-xs text-gray-400">{timeAgo(order.placed_at)}</span>
+          {order.is_scheduled && order.scheduled_for && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
+              📅 {formatScheduledFor(order.scheduled_for, tz)}
+            </span>
+          )}
           {order.source && SOURCE_BADGE[order.source] && (
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SOURCE_BADGE[order.source]!.cls}`}>
               {SOURCE_BADGE[order.source]!.label}

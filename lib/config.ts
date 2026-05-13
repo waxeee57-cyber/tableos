@@ -12,7 +12,18 @@ export async function getBusinessConfig(): Promise<BusinessConfig | null> {
     const { data } = await adminClient().from('business_config').select('*').single()
 
     if (data) {
-      cached = data as BusinessConfig
+      const raw = data as Record<string, unknown>
+      cached = {
+        ...raw,
+        total_customers: (raw.total_customers as number) ?? 0,
+        scheduling_enabled: (raw.scheduling_enabled as boolean) ?? false,
+        scheduling_days_ahead: (raw.scheduling_days_ahead as number) ?? 7,
+        scheduling_slot_minutes: (raw.scheduling_slot_minutes as number) ?? 30,
+        reservations_enabled: (raw.reservations_enabled as boolean) ?? false,
+        reservations_days_ahead: (raw.reservations_days_ahead as number) ?? 60,
+        reservations_slot_minutes: (raw.reservations_slot_minutes as number) ?? 30,
+        max_party_size: (raw.max_party_size as number) ?? 20,
+      } as BusinessConfig
       cacheTime = Date.now()
     }
 

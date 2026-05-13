@@ -10,15 +10,17 @@ const NAV_ITEMS = [
   { href: '/admin/menu', label: 'Étlap', icon: '☰' },
   { href: '/admin/orders', label: 'Rendelések', icon: '🛒' },
   { href: '/admin/customers', label: 'Vendégek', icon: '👥' },
+  { href: '/admin/reservations', label: 'Foglalások', icon: '📅', reservationsOnly: true },
   { href: '/admin/kitchen', label: 'Konyha', icon: '🍳', kitchenOnly: true },
   { href: '/admin/settings', label: 'Beállítások', icon: '⚙', adminOnly: true },
 ]
 
 interface Props {
   role: 'admin' | 'staff' | 'kitchen'
+  reservationsEnabled?: boolean
 }
 
-export default function AdminSidebar({ role }: Props) {
+export default function AdminSidebar({ role, reservationsEnabled = false }: Props) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -36,6 +38,7 @@ export default function AdminSidebar({ role }: Props) {
     if (role === 'kitchen') return item.kitchenOnly === true
     if (item.kitchenOnly) return false
     if (item.adminOnly) return role === 'admin'
+    if (item.reservationsOnly) return reservationsEnabled
     return true
   })
 

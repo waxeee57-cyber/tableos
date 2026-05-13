@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Bricolage_Grotesque, Onest, Caveat } from 'next/font/google'
 import './globals.css'
 
@@ -24,6 +24,18 @@ export const metadata: Metadata = {
   title: 'TableOS',
   description: 'Restaurant ordering and management',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'TableOS',
+    statusBarStyle: 'black-translucent',
+  },
+  icons: {
+    apple: '/icons/icon-192.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#E85D04',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -25,6 +25,16 @@ export interface BusinessConfig {
   operating_hours: Record<string, { open: string; close: string } | null>
   meta_description: string | null
   og_image_url: string | null
+  total_customers: number
+  // Feature 1 — scheduled orders (not in DB yet; defaults applied in getBusinessConfig)
+  scheduling_enabled: boolean
+  scheduling_days_ahead: number
+  scheduling_slot_minutes: number
+  // Feature 2 — reservations (not in DB yet; defaults applied in getBusinessConfig)
+  reservations_enabled: boolean
+  reservations_days_ahead: number
+  reservations_slot_minutes: number
+  max_party_size: number
 }
 
 export interface MenuCategory {
@@ -157,6 +167,11 @@ export interface Order {
   customer_notes: string | null
   admin_notes: string | null
   source: 'online' | 'phone' | 'walk_in' | 'admin'
+  // Feature 1 — scheduled orders
+  scheduled_for: string | null
+  is_scheduled: boolean
+  // Feature 3 — order-ahead
+  reservation_id: string | null
   placed_at: string
   accepted_at: string | null
   preparing_at: string | null
@@ -204,4 +219,21 @@ export interface Table {
   status: 'available' | 'occupied' | 'reserved' | 'unavailable'
   is_visible: boolean
   sort_order: number
+}
+
+// Feature 2 — reservations
+export interface Reservation {
+  id: string
+  business_id: string
+  customer_name: string
+  customer_phone: string
+  customer_email: string | null
+  party_size: number
+  reservation_date: string   // YYYY-MM-DD
+  reservation_time: string   // HH:MM:SS
+  notes: string | null
+  status: 'pending' | 'confirmed' | 'cancelled' | 'seated'
+  internal_notes: string | null
+  created_at: string
+  updated_at: string
 }
