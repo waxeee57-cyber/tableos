@@ -111,10 +111,18 @@ export async function POST(request: NextRequest) {
     })
     .filter(Boolean) as Array<{ phone: string; row_index: number }>
 
-  const { data: existingCustomers } = await adminClient()
-    .from('customers')
-    .select('id, phone, order_count, total_spent')
-    .in('phone', allPhones.map((p) => p.phone))
+  // Chunk the .in() query to stay under PostgREST URL length limits
+  const allPhoneValues = allPhones.map((p) => p.phone)
+  const existingRows: Array<{ id: string; phone: string; order_count: number; total_spent: number }> = []
+  const CHUNK = 1000
+  for (let i = 0; i < allPhoneValues.length; i += CHUNK) {
+    const { data } = await adminClient()
+      .from('customers')
+      .select('id, phone, order_count, total_spent')
+      .in('phone', allPhoneValues.slice(i, i + CHUNK))
+    existingRows.push(...(data ?? []))
+  }
+  const existingCustomers = existingRows
 
   const existingMap = new Map(
     (existingCustomers ?? []).map((c) => [c.phone, c])

@@ -92,16 +92,18 @@ export async function POST(request: NextRequest) {
     duplicatePhones.push(normalized)
   })
 
-  // Batch check which phones already exist
+  // Batch check which phones already exist — chunk to avoid URL length limits
   const existingMap = new Map<string, Customer>()
   if (duplicatePhones.length > 0) {
-    const { data: existing } = await adminClient()
-      .from('customers')
-      .select('*')
-      .in('phone', duplicatePhones)
-
-    for (const c of existing ?? []) {
-      existingMap.set(c.phone, c as Customer)
+    const CHUNK = 1000
+    for (let i = 0; i < duplicatePhones.length; i += CHUNK) {
+      const { data: existing } = await adminClient()
+        .from('customers')
+        .select('*')
+        .in('phone', duplicatePhones.slice(i, i + CHUNK))
+      for (const c of existing ?? []) {
+        existingMap.set(c.phone, c as Customer)
+      }
     }
   }
 
