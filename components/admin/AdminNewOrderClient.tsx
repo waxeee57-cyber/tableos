@@ -131,30 +131,36 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
   // Stage 1: customer search
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
-    if (searchQuery.length < 2) {
+    if (!searchQuery.trim()) {
       setSearchResults([])
       setIsSearching(false)
+      setSearchError(null)
       return
     }
     setIsSearching(true)
+    setSearchError(null)
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(searchQuery)}`)
+        console.log('[CustomerSearch] Fetching:', searchQuery)
+        const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(searchQuery)}`, { credentials: 'include' })
+        console.log('[CustomerSearch] Response status:', res.status)
         if (res.ok) {
           const data = await res.json()
+          console.log('[CustomerSearch] Results count:', data.customers?.length ?? 0)
           setSearchResults(data.customers ?? [])
           setSearchError(null)
         } else {
           setSearchResults([])
-          setSearchError(res.status === 401 ? 'Hitelesítési hiba — frissítsd az oldalt.' : 'Keresési hiba. Próbáld újra.')
+          setSearchError(res.status === 401 ? 'Hitelesítési hiba — frissítsd az oldalt.' : `Keresési hiba (${res.status}). Próbáld újra.`)
         }
-      } catch {
+      } catch (err) {
+        console.error('[CustomerSearch] Error:', err)
         setSearchResults([])
         setSearchError('Hálózati hiba. Ellenőrizd a kapcsolatot.')
       } finally {
         setIsSearching(false)
       }
-    }, 200)
+    }, 150)
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
   }, [searchQuery])
 
@@ -482,7 +488,7 @@ export default function AdminNewOrderClient({ categories, items, deliveryZones, 
             <p className="text-sm text-red-500 text-center py-4">{searchError}</p>
           )}
 
-          {searchQuery.length >= 2 && !isSearching && !searchError && searchResults.length === 0 && (
+          {searchQuery.trim().length >= 1 && !isSearching && !searchError && searchResults.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-4">
               Nincs találat erre: „{searchQuery}"
             </p>

@@ -7,26 +7,26 @@ export async function GET(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(request.url)
-  // ?q= is the new param; ?phone= is kept for backward compat
-  const q = url.searchParams.get('q') ?? url.searchParams.get('phone') ?? ''
+  const q = (url.searchParams.get('q') ?? url.searchParams.get('phone') ?? '').trim()
 
-  if (q.length < 2) {
+  if (q.length < 1) {
     return NextResponse.json({ customers: [] })
   }
 
   const digitsOnly = q.replace(/\D/g, '')
 
-  // Build OR filter: always search by name; add phone and email conditionally
-  const filters: string[] = [`name.ilike.%${q}%`]
+  // Always search name + email; add phone filter when digits present
+  const filters: string[] = [
+    `name.ilike.%${q}%`,
+    `email.ilike.%${q}%`,
+  ]
 
-  if (q.includes('@')) {
-    filters.push(`email.ilike.%${q}%`)
-  }
-
-  if (digitsOnly.length >= 2) {
+  if (digitsOnly.length >= 1) {
     filters.push(`phone.ilike.%${digitsOnly}%`)
-    // also match raw input in case user typed "+36 30 1" with spaces
-    if (q !== digitsOnly) filters.push(`phone.ilike.%${q}%`)
+    if (q !== digitsOnly) {
+      // also match raw input in case user typed "+36 30 1" with spaces
+      filters.push(`phone.ilike.%${q}%`)
+    }
   }
 
   const { data, error } = await adminClient()
@@ -40,13 +40,22 @@ export async function GET(request: NextRequest) {
 
   // Migration 04 not yet applied — retry with base columns only
   if (error && (error.code === 'PGRST204' || error.message?.includes('schema cache'))) {
-    const { data: minimal } = await adminClient()
+    const { data: minimal, error: fallbackErr } = await adminClient()
       .from('customers')
       .select('id, name, phone, email, address, city, order_count, total_spent, notes')
       .or(filters.join(','))
       .order('created_at', { ascending: false })
       .limit(8)
+    if (fallbackErr) {
+      console.error('[CustomerSearch] fallback error:', fallbackErr)
+      return NextResponse.json({ error: fallbackErr.message }, { status: 500 })
+    }
     return NextResponse.json({ customers: minimal ?? [] })
+  }
+
+  if (error) {
+    console.error('[CustomerSearch] query error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   return NextResponse.json({ customers: data ?? [] })
