@@ -2,6 +2,7 @@ import { requireAdmin } from '@/lib/auth'
 import { getBusinessConfig } from '@/lib/config'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import ServiceWorkerRegister from '@/components/admin/ServiceWorkerRegister'
+import { redirect } from 'next/navigation'
 
 export default async function AdminProtectedLayout({
   children,
@@ -12,6 +13,10 @@ export default async function AdminProtectedLayout({
     requireAdmin(),
     getBusinessConfig(),
   ])
+
+  if (config && !config.onboarding_completed) {
+    redirect('/admin/onboarding')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

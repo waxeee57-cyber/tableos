@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/admin/orders', label: 'Rendelések', icon: '🛒' },
   { href: '/admin/customers', label: 'Vendégek', icon: '👥' },
   { href: '/admin/reservations', label: 'Foglalások', icon: '📅', reservationsOnly: true },
+  { href: '/admin/analytics', label: 'Analitika', icon: '📊' },
   { href: '/admin/kitchen', label: 'Konyha', icon: '🍳', kitchenOnly: true },
   { href: '/admin/settings', label: 'Beállítások', icon: '⚙', adminOnly: true },
 ]

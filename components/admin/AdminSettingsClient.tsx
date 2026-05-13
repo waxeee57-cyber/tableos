@@ -67,6 +67,7 @@ export default function AdminSettingsClient({ initialConfig, initialZones }: Pro
           { key: 'info', label: 'Étterem adatai' },
           { key: 'hours', label: 'Nyitvatartás' },
           { key: 'orders', label: 'Rendelések' },
+          { key: 'payments', label: 'Fizetés' },
           { key: 'zones', label: 'Kiszállítási zónák' },
         ].map(({ key, label }) => (
           <button
@@ -185,6 +186,34 @@ export default function AdminSettingsClient({ initialConfig, initialZones }: Pro
               value={String(config.estimated_delivery_minutes ?? 45)}
               onChange={(v) => set('estimated_delivery_minutes', parseInt(v) || 45)}
             />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'payments' && (
+        <div className="bg-white rounded-xl border p-6 space-y-6">
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-900">Fizetési módok</h3>
+            <Toggle
+              label="Kiszállításhoz készpénz engedélyezése"
+              checked={config.cash_on_delivery_enabled ?? true}
+              onChange={(v) => set('cash_on_delivery_enabled', v)}
+            />
+            <Toggle
+              label="Elvitelhez készpénz engedélyezése"
+              checked={config.cash_on_pickup_enabled ?? true}
+              onChange={(v) => set('cash_on_pickup_enabled', v)}
+            />
+            <Toggle
+              label="Online kártyafizetés (Stripe)"
+              checked={config.online_payment_enabled ?? false}
+              onChange={(v) => set('online_payment_enabled', v)}
+            />
+            {config.online_payment_enabled && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                Az online kártyafizetés aktiválásához lépj kapcsolatba a Domrol supporttal — a Stripe konfigurációt mi végezzük el 24 órán belül.
+              </div>
+            )}
           </div>
         </div>
       )}

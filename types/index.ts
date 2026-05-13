@@ -35,6 +35,13 @@ export interface BusinessConfig {
   reservations_days_ahead: number
   reservations_slot_minutes: number
   max_party_size: number
+  // Phase 2 Feature 1 — payments
+  online_payment_enabled: boolean
+  cash_on_delivery_enabled: boolean
+  cash_on_pickup_enabled: boolean
+  // Phase 2 Feature 2 — onboarding
+  onboarding_completed: boolean
+  onboarding_step: number
 }
 
 export interface MenuCategory {
@@ -135,7 +142,7 @@ export type OrderStatus =
 
 export type OrderType = 'delivery' | 'takeaway' | 'dine_in'
 export type PaymentMethod = 'cash' | 'card' | 'card_online' | 'szep_card'
-export type PaymentStatus = 'pending' | 'paid' | 'refunded'
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'cash'
 
 export interface StatusHistoryEntry {
   status: string
@@ -161,6 +168,8 @@ export interface Order {
   total: number
   payment_method: PaymentMethod
   payment_status: PaymentStatus
+  payment_intent_id: string | null
+  paid_at: string | null
   customer_name: string
   customer_phone: string
   customer_email: string | null

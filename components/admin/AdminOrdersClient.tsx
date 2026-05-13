@@ -326,11 +326,14 @@ function OrderCard({
       </div>
 
       <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
-        <span className="font-bold text-gray-900">
-          {formatPrice(order.total, currency, symbol)}
-          {' · '}
-          <span className="font-normal text-gray-500">{payLabel[order.payment_method] ?? order.payment_method}</span>
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-gray-900">
+            {formatPrice(order.total, currency, symbol)}
+            {' · '}
+            <span className="font-normal text-gray-500">{payLabel[order.payment_method] ?? order.payment_method}</span>
+          </span>
+          <PaymentBadge status={order.payment_status} />
+        </div>
 
         <div className="flex gap-2 flex-wrap">
           <button
@@ -357,6 +360,26 @@ function OrderCard({
         </div>
       </div>
     </div>
+  )
+}
+
+function PaymentBadge({ status }: { status: string }) {
+  const cfg: Record<string, string> = {
+    paid: 'bg-green-100 text-green-700',
+    cash: 'bg-gray-100 text-gray-600',
+    pending: 'bg-yellow-100 text-yellow-700',
+    failed: 'bg-red-100 text-red-600',
+    refunded: 'bg-orange-100 text-orange-700',
+  }
+  const labels: Record<string, string> = {
+    paid: '✓ Fizetve', cash: 'Készpénz', pending: 'Fizetés folyamatban',
+    failed: 'Fizetés sikertelen', refunded: 'Visszatérítve',
+  }
+  if (!status || status === 'pending') return null
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      {labels[status] ?? status}
+    </span>
   )
 }
 

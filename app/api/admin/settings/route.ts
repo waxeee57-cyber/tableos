@@ -25,10 +25,24 @@ export async function PATCH(request: NextRequest) {
     'delivery_enabled', 'takeaway_enabled', 'dine_in_enabled',
     'delivery_fee', 'delivery_fee_threshold', 'min_order_amount',
     'estimated_delivery_minutes', 'operating_hours', 'meta_description',
+    // Phase 2 — payments
+    'online_payment_enabled', 'cash_on_delivery_enabled', 'cash_on_pickup_enabled',
+    // Phase 2 — scheduling/reservations
+    'scheduling_enabled', 'scheduling_days_ahead', 'scheduling_slot_minutes',
+    'reservations_enabled', 'reservations_days_ahead', 'reservations_slot_minutes', 'max_party_size',
   ]
+
+  // Onboarding fields — admin only
+  const adminOnly = ['onboarding_completed', 'onboarding_step']
+
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
   for (const key of allowed) {
     if (key in body) update[key] = body[key]
+  }
+  if (auth.adminUser.role === 'admin') {
+    for (const key of adminOnly) {
+      if (key in body) update[key] = body[key]
+    }
   }
 
   const { data, error } = await adminClient().from('business_config').update(update).select('*').single()

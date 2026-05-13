@@ -23,6 +23,11 @@ export async function getBusinessConfig(): Promise<BusinessConfig | null> {
         reservations_days_ahead: (raw.reservations_days_ahead as number) ?? 60,
         reservations_slot_minutes: (raw.reservations_slot_minutes as number) ?? 30,
         max_party_size: (raw.max_party_size as number) ?? 20,
+        online_payment_enabled: (raw.online_payment_enabled as boolean) ?? false,
+        cash_on_delivery_enabled: (raw.cash_on_delivery_enabled as boolean) ?? true,
+        cash_on_pickup_enabled: (raw.cash_on_pickup_enabled as boolean) ?? true,
+        onboarding_completed: (raw.onboarding_completed as boolean) ?? false,
+        onboarding_step: (raw.onboarding_step as number) ?? 0,
       } as BusinessConfig
       cacheTime = Date.now()
     }

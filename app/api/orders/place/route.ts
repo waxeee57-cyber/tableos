@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import Stripe from 'stripe'
 import { adminClient } from '@/lib/supabase/admin'
 import { rateLimit, getClientIP } from '@/lib/rate-limit'
 import { getBusinessConfig, generateOrderNumber, isOpen } from '@/lib/config'
@@ -39,6 +40,9 @@ const PlaceOrderSchema = z.object({
   scheduled_for: z.string().datetime().optional().nullable(),
   // Feature 3 — reservation linkage
   reservation_id: z.string().uuid().optional().nullable(),
+  // Phase 2 — Stripe payment
+  payment_intent_id: z.string().optional().nullable(),
+  payment_status: z.enum(['pending', 'paid', 'failed', 'cash']).default('cash'),
 })
 
 export async function POST(request: NextRequest) {
@@ -93,6 +97,39 @@ export async function POST(request: NextRequest) {
     if (reservation.status === 'cancelled') {
       return NextResponse.json({ error: 'Cannot order for a cancelled reservation' }, { status: 400 })
     }
+  }
+
+  // Stripe payment verification
+  let paymentIntentId: string | null = data.payment_intent_id ?? null
+  let paymentStatus: string = data.payment_status
+
+  if (paymentStatus === 'paid' && paymentIntentId) {
+    const secretKey = process.env.STRIPE_SECRET_KEY
+    if (!secretKey) {
+      return NextResponse.json({ error: 'Payment configuration error' }, { status: 500 })
+    }
+    const stripe = new Stripe(secretKey)
+    let pi: Stripe.PaymentIntent
+    try {
+      pi = await stripe.paymentIntents.retrieve(paymentIntentId)
+    } catch {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 400 })
+    }
+    if (pi.status !== 'succeeded') {
+      return NextResponse.json({ error: 'Payment not completed' }, { status: 400 })
+    }
+    // Prevent reuse
+    const { data: existing } = await adminClient()
+      .from('orders')
+      .select('id')
+      .eq('payment_intent_id', paymentIntentId)
+      .limit(1)
+      .single()
+    if (existing) {
+      return NextResponse.json({ error: 'Payment already used' }, { status: 400 })
+    }
+  } else if (paymentStatus !== 'paid') {
+    paymentIntentId = null
   }
 
   // Only enforce isOpen check for non-scheduled, non-reservation ASAP orders
@@ -169,7 +206,9 @@ export async function POST(request: NextRequest) {
     subtotal,
     total,
     payment_method: data.paymentMethod,
-    payment_status: 'pending',
+    payment_status: paymentStatus,
+    payment_intent_id: paymentIntentId,
+    paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null,
     customer_name: data.customer.name,
     customer_phone: data.customer.phone,
     customer_email: data.customer.email ?? null,
