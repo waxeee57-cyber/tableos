@@ -190,41 +190,50 @@ export async function POST(request: NextRequest) {
     customerId = newCustomer?.id ?? null
   }
 
-  const orderNumber = generateOrderNumber(config.business_name)
+  // Retry up to 3 times on order_number collision (23505 unique violation)
+  let order: Record<string, unknown> | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const orderNumber = generateOrderNumber(config.business_name)
+    const { data: o, error: oErr } = await adminClient().from('orders').insert({
+      order_number: orderNumber,
+      customer_id: customerId,
+      order_type: data.orderType,
+      status: 'new',
+      status_history: [{ status: 'new', timestamp: new Date().toISOString() }],
+      delivery_address: data.delivery?.address ?? null,
+      delivery_city: data.delivery?.city ?? null,
+      delivery_postal_code: data.delivery?.postalCode ?? null,
+      delivery_notes: data.delivery?.notes ?? null,
+      delivery_fee: deliveryFee,
+      subtotal,
+      total,
+      payment_method: data.paymentMethod,
+      payment_status: paymentStatus,
+      payment_intent_id: paymentIntentId,
+      paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null,
+      customer_name: data.customer.name,
+      customer_phone: data.customer.phone,
+      customer_email: data.customer.email ?? null,
+      customer_notes: data.notes ?? null,
+      is_scheduled: data.is_scheduled,
+      scheduled_for: scheduledFor,
+      reservation_id: reservationId,
+      source: 'online',
+    }).select('*').single()
 
-  const { data: order, error: orderErr } = await adminClient().from('orders').insert({
-    order_number: orderNumber,
-    customer_id: customerId,
-    order_type: data.orderType,
-    status: 'new',
-    status_history: [{ status: 'new', timestamp: new Date().toISOString() }],
-    delivery_address: data.delivery?.address ?? null,
-    delivery_city: data.delivery?.city ?? null,
-    delivery_postal_code: data.delivery?.postalCode ?? null,
-    delivery_notes: data.delivery?.notes ?? null,
-    delivery_fee: deliveryFee,
-    subtotal,
-    total,
-    payment_method: data.paymentMethod,
-    payment_status: paymentStatus,
-    payment_intent_id: paymentIntentId,
-    paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null,
-    customer_name: data.customer.name,
-    customer_phone: data.customer.phone,
-    customer_email: data.customer.email ?? null,
-    customer_notes: data.notes ?? null,
-    is_scheduled: data.is_scheduled,
-    scheduled_for: scheduledFor,
-    reservation_id: reservationId,
-    source: 'online',
-  }).select('*').single()
+    if (!oErr) { order = o as Record<string, unknown>; break }
+    // Retry only on order_number unique violation
+    if (oErr.code !== '23505' || !oErr.message?.includes('order_number')) {
+      return NextResponse.json({ error: 'Nem sikerült a rendelést menteni.' }, { status: 500 })
+    }
+  }
 
-  if (orderErr || !order) {
+  if (!order) {
     return NextResponse.json({ error: 'Nem sikerült a rendelést menteni.' }, { status: 500 })
   }
 
   const orderItems = data.items.map((i) => ({
-    order_id: order.id,
+    order_id: order!.id,
     menu_item_id: i.menuItemId,
     item_name: i.name,
     item_size: i.size ?? null,
@@ -233,12 +242,17 @@ export async function POST(request: NextRequest) {
     total_price: i.unitPrice * i.quantity,
   }))
 
-  await adminClient().from('order_items').insert(orderItems)
+  const { error: itemsErr } = await adminClient().from('order_items').insert(orderItems)
+  if (itemsErr) {
+    // Roll back the order so no empty order persists
+    await adminClient().from('orders').delete().eq('id', order.id)
+    return NextResponse.json({ error: 'Nem sikerült a rendelést menteni.' }, { status: 500 })
+  }
 
   const { data: createdItems } = await adminClient().from('order_items').select('*').eq('order_id', order.id)
 
   const emailItems = (createdItems ?? []) as OrderItem[]
-  const fullOrder = order as Order
+  const fullOrder = order as unknown as Order
 
   Promise.all([
     data.customer.email

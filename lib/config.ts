@@ -44,16 +44,31 @@ export function invalidateConfigCache() {
 }
 
 export function isOpen(config: BusinessConfig): boolean {
+  const tz = config.timezone ?? 'Europe/Budapest'
   const now = new Date()
-  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-  const day = days[now.getDay()]
-  const hours = config.operating_hours[day]
 
+  // Get current weekday abbreviation in the business timezone
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' })
+    .format(now)
+    .toLowerCase()
+    .slice(0, 3)
+
+  const hours = config.operating_hours[day]
   if (!hours) return false
 
+  // Get current HH:MM in the business timezone
+  const tzTime = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now)
+
+  const [currentH, currentM] = tzTime.replace(/^24/, '00').split(':').map(Number)
   const [openH, openM] = hours.open.split(':').map(Number)
   const [closeH, closeM] = hours.close.split(':').map(Number)
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+  const currentMinutes = currentH * 60 + currentM
   const openMinutes = openH * 60 + openM
   const closeMinutes = closeH * 60 + closeM
 

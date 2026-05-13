@@ -33,8 +33,10 @@ export async function GET(request: NextRequest) {
     .select('*', { count: 'exact' })
 
   if (q) {
+    // Strip PostgREST filter metacharacters that could break the .or() syntax
+    const safe = q.replace(/[,()]/g, '')
     query = query.or(
-      `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,address.ilike.%${q}%`
+      `name.ilike.%${safe}%,phone.ilike.%${safe}%,email.ilike.%${safe}%,address.ilike.%${safe}%`
     )
   }
 
@@ -76,8 +78,9 @@ export async function GET(request: NextRequest) {
         .select(BASE_SELECT, { count: 'exact' })
 
       if (q) {
+        const safe = q.replace(/[,()]/g, '')
         fallback = fallback.or(
-          `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,address.ilike.%${q}%`
+          `name.ilike.%${safe}%,phone.ilike.%${safe}%,email.ilike.%${safe}%,address.ilike.%${safe}%`
         )
       }
       // Skip vip/active/dormant filters — all require new columns

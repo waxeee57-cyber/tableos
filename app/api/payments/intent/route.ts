@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import Stripe from 'stripe'
 import { getBusinessConfig } from '@/lib/config'
+import { rateLimit, getClientIP } from '@/lib/rate-limit'
 
 const IntentSchema = z.object({
   amount: z.number().int().min(1),
@@ -9,6 +10,11 @@ const IntentSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIP(request)
+  if (!rateLimit(`payment-intent:${ip}`, 20, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   let body: unknown
   try {
     body = await request.json()

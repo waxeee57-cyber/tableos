@@ -147,10 +147,7 @@ export async function POST(request: NextRequest) {
     Date.now() + input.estimated_delivery_minutes * 60 * 1000
   ).toISOString()
 
-  const orderNumber = generateOrderNumber(config.business_name)
-
   const baseOrderPayload = {
-    order_number: orderNumber,
     customer_id: customerId ?? null,
     order_type: input.order_type,
     status: 'accepted',
@@ -173,25 +170,30 @@ export async function POST(request: NextRequest) {
     accepted_at: now,
   }
 
-  // Try order insert with source; fall back if migration 05 not applied
-  let orderResult = await adminClient()
-    .from('orders')
-    .insert({ ...baseOrderPayload, source: 'phone' })
-    .select('*')
-    .single()
-
-  if (isSchemaCacheError(orderResult.error)) {
-    orderResult = await adminClient()
+  // Retry up to 3 times on order_number unique collision
+  let order: Record<string, unknown> | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const orderNumber = generateOrderNumber(config.business_name)
+    let result = await adminClient()
       .from('orders')
-      .insert(baseOrderPayload)
+      .insert({ ...baseOrderPayload, order_number: orderNumber, source: 'phone' })
       .select('*')
       .single()
+    if (isSchemaCacheError(result.error)) {
+      result = await adminClient()
+        .from('orders')
+        .insert({ ...baseOrderPayload, order_number: orderNumber })
+        .select('*')
+        .single()
+    }
+    if (!result.error) { order = result.data as Record<string, unknown>; break }
+    if (result.error.code !== '23505' || !result.error.message?.includes('order_number')) {
+      return NextResponse.json({ error: result.error.message ?? 'Failed to create order' }, { status: 500 })
+    }
   }
 
-  const { data: order, error: orderErr } = orderResult
-
-  if (orderErr || !order) {
-    return NextResponse.json({ error: orderErr?.message ?? 'Failed to create order' }, { status: 500 })
+  if (!order) {
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 
   // Insert order items
@@ -212,7 +214,8 @@ export async function POST(request: NextRequest) {
     .select('*')
 
   if (itemsErr) {
-    console.error('[Phone order] Items insert error:', itemsErr)
+    await adminClient().from('orders').delete().eq('id', order.id)
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 
   // Update customer aggregates (fire-and-forget)

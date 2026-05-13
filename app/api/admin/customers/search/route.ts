@@ -13,19 +13,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ customers: [] })
   }
 
-  const digitsOnly = q.replace(/\D/g, '')
+  // Strip PostgREST filter metacharacters before injecting into .or() string
+  const safe = q.replace(/[,()]/g, '')
+  const digitsOnly = safe.replace(/\D/g, '')
 
   // Always search name + email; add phone filter when digits present
   const filters: string[] = [
-    `name.ilike.%${q}%`,
-    `email.ilike.%${q}%`,
+    `name.ilike.%${safe}%`,
+    `email.ilike.%${safe}%`,
   ]
 
   if (digitsOnly.length >= 1) {
     filters.push(`phone.ilike.%${digitsOnly}%`)
-    if (q !== digitsOnly) {
+    if (safe !== digitsOnly) {
       // also match raw input in case user typed "+36 30 1" with spaces
-      filters.push(`phone.ilike.%${q}%`)
+      filters.push(`phone.ilike.%${safe}%`)
     }
   }
 
