@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const ip = getClientIP(request)
-  if (!rateLimit(`import-execute:${ip}`, 2, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`import-execute:${ip}`, 2, 60 * 60 * 1000))) {
     return NextResponse.json({ error: 'Túl sok importálási kísérlet. Próbáld egy óra múlva.' }, { status: 429 })
   }
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Hiányzó paraméterek.' }, { status: 400 })
   }
 
-  const session = getImportSession(session_id)
+  const session = await getImportSession(session_id)
   if (!session) {
     return NextResponse.json({ error: 'A munkamenet lejárt. Töltsd fel újra a fájlt.' }, { status: 404 })
   }

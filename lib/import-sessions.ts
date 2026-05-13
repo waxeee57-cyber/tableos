@@ -1,3 +1,5 @@
+import { adminClient } from '@/lib/supabase/admin'
+
 export interface ImportSession {
   columns: string[]
   rows: string[][]
@@ -5,30 +7,44 @@ export interface ImportSession {
   created_at: number
 }
 
-const sessions = new Map<string, ImportSession>()
+const TTL_MS = 30 * 60 * 1000 // 30 minutes
 
-function cleanup() {
-  const now = Date.now()
-  for (const [id, session] of sessions) {
-    if (now - session.created_at > 60 * 60 * 1000) {
-      sessions.delete(id)
-    }
-  }
+export async function createImportSession(
+  columns: string[],
+  rows: string[][],
+  total_rows: number
+): Promise<string> {
+  // Delete expired sessions on write to keep the table small
+  const expiry = new Date(Date.now() - TTL_MS).toISOString()
+  await adminClient().from('import_sessions').delete().lt('created_at', expiry)
+
+  const { data, error } = await adminClient()
+    .from('import_sessions')
+    .insert({ data: { columns, rows, total_rows } })
+    .select('id')
+    .single()
+
+  if (error || !data) throw new Error('Failed to create import session')
+  return data.id as string
 }
 
-export function createImportSession(columns: string[], rows: string[][], total_rows: number): string {
-  cleanup()
-  const id = crypto.randomUUID()
-  sessions.set(id, { columns, rows, total_rows, created_at: Date.now() })
-  return id
-}
+export async function getImportSession(id: string): Promise<ImportSession | null> {
+  const expiry = new Date(Date.now() - TTL_MS).toISOString()
 
-export function getImportSession(id: string): ImportSession | null {
-  const session = sessions.get(id)
-  if (!session) return null
-  if (Date.now() - session.created_at > 60 * 60 * 1000) {
-    sessions.delete(id)
-    return null
+  // Delete expired sessions on read
+  await adminClient().from('import_sessions').delete().lt('created_at', expiry)
+
+  const { data } = await adminClient()
+    .from('import_sessions')
+    .select('data, created_at')
+    .eq('id', id)
+    .single()
+
+  if (!data) return null
+
+  const payload = data.data as { columns: string[]; rows: string[][]; total_rows: number }
+  return {
+    ...payload,
+    created_at: new Date(data.created_at as string).getTime(),
   }
-  return session
 }

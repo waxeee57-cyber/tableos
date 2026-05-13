@@ -19,7 +19,7 @@ const ReservationSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request)
-  if (!rateLimit(`reservation:${ip}`, 10, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`reservation:${ip}`, 10, 60 * 60 * 1000))) {
     return NextResponse.json({ error: 'Túl sok kérés. Próbáld később.' }, { status: 429 })
   }
 

@@ -11,7 +11,7 @@ const IntentSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request)
-  if (!rateLimit(`payment-intent:${ip}`, 20, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`payment-intent:${ip}`, 20, 60 * 60 * 1000))) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 

@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const ip = getClientIP(request)
-  if (!rateLimit(`import:${ip}`, 3, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`import:${ip}`, 3, 60 * 60 * 1000))) {
     return NextResponse.json({ error: 'Túl sok import. Próbáld egy óra múlva.' }, { status: 429 })
   }
 

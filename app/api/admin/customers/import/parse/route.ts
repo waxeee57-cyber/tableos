@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const ip = getClientIP(request)
-  if (!rateLimit(`import-parse:${ip}`, 5, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`import-parse:${ip}`, 5, 60 * 60 * 1000))) {
     return NextResponse.json({ error: 'Túl sok feltöltési kísérlet. Próbáld egy óra múlva.' }, { status: 429 })
   }
 
@@ -92,7 +92,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'A fájl üres vagy nem olvasható.' }, { status: 400 })
   }
 
-  const session_id = createImportSession(headers, rows, rows.length)
+  let session_id: string
+  try {
+    session_id = await createImportSession(headers, rows, rows.length)
+  } catch {
+    return NextResponse.json({ error: 'Nem sikerült a munkamenetet létrehozni.' }, { status: 500 })
+  }
 
   return NextResponse.json({
     columns: headers,

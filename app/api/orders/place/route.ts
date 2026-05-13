@@ -47,7 +47,7 @@ const PlaceOrderSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request)
-  if (!rateLimit(`order:${ip}`, 10, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`order:${ip}`, 10, 60 * 60 * 1000))) {
     return NextResponse.json({ error: 'Túl sok rendelés. Próbáld később.' }, { status: 429 })
   }
 

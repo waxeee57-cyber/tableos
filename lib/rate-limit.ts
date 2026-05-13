@@ -1,23 +1,19 @@
-const store = new Map<string, number[]>()
+import { adminClient } from '@/lib/supabase/admin'
 
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now()
-  const windowStart = now - windowMs
-  const timestamps = (store.get(key) ?? []).filter((t) => t > windowStart)
+export async function rateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const { data, error } = await adminClient().rpc('check_rate_limit', {
+    p_key: key,
+    p_limit: limit,
+    p_window_ms: windowMs,
+  })
 
-  if (timestamps.length >= limit) return false
-
-  timestamps.push(now)
-  store.set(key, timestamps)
-
-  // Prune keys with no recent activity to prevent unbounded memory growth
-  if (store.size > 10_000) {
-    for (const [k, ts] of store) {
-      if (ts.every((t) => t <= windowStart)) store.delete(k)
-    }
+  if (error) {
+    // Fail open: if the DB is unreachable, don't block legitimate requests
+    console.error('[rate-limit]', error.message)
+    return true
   }
 
-  return true
+  return data as boolean
 }
 
 export function getClientIP(request: Request): string {
