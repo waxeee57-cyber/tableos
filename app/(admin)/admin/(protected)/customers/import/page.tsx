@@ -32,6 +32,7 @@ interface ExecuteResult {
   imported: number
   duplicates: number
   errors: number
+  warning?: string
 }
 
 const TARGET_FIELDS = [
@@ -446,9 +447,17 @@ export default function ImportPage() {
       {/* ---- Done ---- */}
       {executeResult && (
         <div className="text-center py-8">
-          <div className="text-4xl mb-4">✅</div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Importálás kész!</h2>
-          <p className="text-gray-600 mb-1"><strong>{executeResult.imported}</strong> vendég sikeresen importálva.</p>
+          <div className="text-4xl mb-4">{executeResult.warning ? '⚠️' : '✅'}</div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
+            {executeResult.warning ? 'Import problémával zárult' : 'Importálás kész!'}
+          </h2>
+          {executeResult.warning ? (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-3 mx-auto max-w-md">
+              {executeResult.warning}
+            </p>
+          ) : (
+            <p className="text-gray-600 mb-1"><strong>{executeResult.imported}</strong> vendég sikeresen importálva.</p>
+          )}
           {executeResult.errors > 0 && (
             <p className="text-sm text-red-600 mb-1">{executeResult.errors} sor hibával.</p>
           )}

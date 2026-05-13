@@ -203,14 +203,22 @@ export async function POST(request: NextRequest) {
     }
   })
 
-  // Execute inserts in batches of 100
+  // Execute inserts in batches of 100, ignoring phone conflicts
+  let batchErrors = 0
   const insertBatches = chunk(toInsert, 100)
   for (const batch of insertBatches) {
-    const { error } = await adminClient().from('customers').insert(batch)
+    const { data: inserted, error } = await adminClient()
+      .from('customers')
+      .upsert(batch, { onConflict: 'phone', ignoreDuplicates: true })
+      .select('id')
     if (error) {
+      batchErrors++
       errorLog.push({ row_index: -1, reason: `Batch insert hiba: ${error.message}` })
     } else {
-      importedCount += batch.length
+      const actuallyInserted = inserted?.length ?? 0
+      importedCount += actuallyInserted
+      // Rows in batch but not returned were silently skipped due to phone conflict
+      duplicatesCount += batch.length - actuallyInserted
     }
   }
 
@@ -254,11 +262,17 @@ export async function POST(request: NextRequest) {
       .not('id', 'is', null)
   }
 
+  const warning =
+    importedCount === 0 && batchErrors > 0
+      ? `Az import nem sikerült: ${errorsCount} érvénytelen sor, ${duplicatesCount} duplikált, ${batchErrors} batch hiba.`
+      : null
+
   return NextResponse.json({
     ok: true,
     imported: importedCount,
     duplicates: duplicatesCount,
     errors: errorsCount,
     import_id: importId,
+    ...(warning ? { warning } : {}),
   })
 }
