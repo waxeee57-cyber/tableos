@@ -61,6 +61,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Érvénytelen adatok.', details: parsed.error.issues }, { status: 400 })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { is_vip: _is_vip, ...baseUpdateData } = parsed.data
+
   const { data, error } = await adminClient()
     .from('customers')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -74,6 +77,19 @@ export async function PATCH(
         { error: 'Egy vendég már létezik ezzel a telefonszámmal.' },
         { status: 409 }
       )
+    }
+    // Migration 04 not yet applied — retry without is_vip
+    if (error.code === 'PGRST204' || error.message?.includes('schema cache')) {
+      const { data: retry, error: retryErr } = await adminClient()
+        .from('customers')
+        .update({ ...baseUpdateData, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .single()
+      if (retryErr) {
+        return NextResponse.json({ error: retryErr.message }, { status: 500 })
+      }
+      return NextResponse.json({ customer: retry })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

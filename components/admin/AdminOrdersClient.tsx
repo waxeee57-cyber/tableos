@@ -87,8 +87,10 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
     }
   }, [])
 
-  // Realtime: INSERT fires notification; UPDATE just refreshes list
+  // Realtime: INSERT fires notification; UPDATE just refreshes list.
+  // Falls back to 30s polling if Realtime is unavailable.
   useEffect(() => {
+    let pollInterval: ReturnType<typeof setInterval> | null = null
     const supabase = createClient()
     const channel = supabase
       .channel('admin-orders')
@@ -107,9 +109,16 @@ export default function AdminOrdersClient({ initialOrders, config }: Props) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
         fetchOrders()
       })
-      .subscribe()
+      .subscribe((status) => {
+        if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !pollInterval) {
+          pollInterval = setInterval(fetchOrders, 30_000)
+        }
+      })
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+      if (pollInterval) clearInterval(pollInterval)
+    }
   }, [fetchOrders])
 
   async function updateStatus(orderId: string, status: OrderStatus) {

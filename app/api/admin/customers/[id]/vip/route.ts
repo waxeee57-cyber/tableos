@@ -26,6 +26,13 @@ export async function PATCH(
     .eq('id', id)
 
   if (error) {
+    // Migration 04 not yet applied
+    if (error.code === 'PGRST204' || error.message?.includes('schema cache')) {
+      return NextResponse.json(
+        { error: 'A VIP funkció még nem elérhető. Alkalmazza a 04_customers_enhancements.sql migrációt.' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

@@ -49,25 +49,25 @@ const FEATURES = [
 const PRICING = [
   {
     name: 'Starter',
-    price: '€29',
+    price: '€59',
     cadence: '/ hó',
-    lines: ['14 napos ingyenes próba', '1 helyszín', 'Kiszállítás + elvitel', 'Email értesítések', 'Nincs beállítási díj'],
-    cta: 'Kezdem ingyen',
+    lines: ['1 helyszín', 'Kiszállítás + elvitel', 'Email értesítések', 'Nincs beállítási díj'],
+    cta: 'Kezdem',
     href: '/admin/login',
     accent: false,
   },
   {
     name: 'Growth',
-    price: '€59',
+    price: '€99',
     cadence: '/ hó',
     lines: ['Minden a Starterből', 'Kitchen Display', 'CSV étlap import', 'Kiszállítási zónák', 'Prioritásos support'],
-    cta: 'Kezdem ingyen',
+    cta: 'Kezdem',
     href: '/admin/login',
     accent: true,
   },
   {
     name: 'Pro',
-    price: '€99',
+    price: '€149',
     cadence: '/ hó',
     lines: ['Minden a Growth-ból', 'Több helyszín', 'Dedikált support', 'Egyedi fejlesztés lehetséges'],
     cta: 'Kapcsolatba lépek',
@@ -293,10 +293,10 @@ export function TableOSHome() {
         <div className="mx-auto max-w-6xl px-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-display text-xl font-bold text-white">Készen állsz az indulásra?</p>
-            <p className="font-sans text-sm text-slate-400 mt-1">14 napos ingyenes próba. Nincs kártyaadat.</p>
+            <p className="font-sans text-sm text-slate-400 mt-1">Kötöttség nélkül. Az első naptól teljes hozzáférés.</p>
           </div>
           <a href="/admin/login" className="btn-3d shrink-0 inline-flex items-center justify-center min-h-[44px] rounded-md bg-brand px-6 py-3 font-sans text-sm font-medium text-white">
-            Kipróbálom →
+            Kezdem →
           </a>
         </div>
       </section>
@@ -307,7 +307,7 @@ export function TableOSHome() {
           <div className="mb-14 text-center">
             <p className="mb-3 font-sans text-xs uppercase tracking-[0.2em] text-brand">Árazás</p>
             <h2 className="font-display text-4xl font-bold tracking-tight text-white md:text-5xl">Átlátható árazás</h2>
-            <p className="mt-3 font-sans text-sm text-slate-400">14 napos ingyenes próba, kötöttség nélkül.</p>
+            <p className="mt-3 font-sans text-sm text-slate-400">Havi előfizetés, kötöttség nélkül. Bármikor lemondható.</p>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:items-start">
             {PRICING.map(({ name, price, cadence, lines, cta, href, accent }) => (
@@ -336,6 +336,9 @@ export function TableOSHome() {
               </div>
             ))}
           </div>
+          <p className="mt-10 text-center font-sans text-sm text-slate-400 max-w-xl mx-auto">
+            A legtöbb étterem az első hónapban megtéríti a díjat — a Wolt-jutalék megtakarításából.
+          </p>
         </div>
       </section>
 
@@ -372,7 +375,7 @@ export function TableOSHome() {
           </h2>
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <a href="/admin/login" className="btn-3d inline-flex items-center justify-center min-h-[44px] rounded-md bg-brand px-8 py-4 font-sans text-sm font-medium text-white">
-              Kipróbálom ingyen →
+              Kezdem →
             </a>
             <a href="mailto:hello@domrol.com" className="btn-3d inline-flex items-center justify-center min-h-[44px] rounded-md border border-white/20 px-8 py-4 font-sans text-sm font-medium text-white hover:border-white/40 hover:bg-white/5">
               Kapcsolat

@@ -34,6 +34,11 @@ const OrderSchema = z.object({
   estimated_delivery_minutes: z.number().int().min(0).max(180),
 })
 
+function isSchemaCacheError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false
+  return err.code === 'PGRST204' || (err.message?.includes('schema cache') ?? false)
+}
+
 export async function POST(request: NextRequest) {
   const auth = await requireAdminForAPI()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -76,32 +81,54 @@ export async function POST(request: NextRequest) {
   // Step 2: still no match — create new customer
   if (!customerId) {
     const normalizedPhone = normalizePhone(input.customer_phone) ?? input.customer_phone
+    const baseCustomerPayload = {
+      name: input.customer_name,
+      phone: normalizedPhone,
+      email: input.customer_email ?? null,
+      address: input.delivery_address ?? null,
+      city: input.delivery_city ?? null,
+      postal_code: input.delivery_postal_code ?? null,
+    }
+
     const { data: newCustomer, error: custErr } = await adminClient()
       .from('customers')
-      .insert({
-        name: input.customer_name,
-        phone: normalizedPhone,
-        email: input.customer_email ?? null,
-        address: input.delivery_address ?? null,
-        city: input.delivery_city ?? null,
-        postal_code: input.delivery_postal_code ?? null,
-        source: 'phone',
-      })
+      .insert({ ...baseCustomerPayload, source: 'phone' })
       .select('id')
       .single()
 
     if (custErr) {
-      // Race condition: duplicate phone — find and use existing
       if (custErr.code === '23505') {
-        const normalized = normalizePhone(input.customer_phone) ?? input.customer_phone
+        // Race condition: duplicate phone — find and use existing
         const { data: existing } = await adminClient()
           .from('customers')
           .select('id, name')
-          .eq('phone', normalized)
+          .eq('phone', normalizedPhone)
           .maybeSingle()
         if (existing) {
           customerId = existing.id as string
           autoLinkedCustomer = existing.name as string
+        }
+      } else if (isSchemaCacheError(custErr)) {
+        // Migration 04 not applied — retry without source column
+        const { data: retryCustomer, error: retryErr } = await adminClient()
+          .from('customers')
+          .insert(baseCustomerPayload)
+          .select('id')
+          .single()
+        if (!retryErr && retryCustomer) {
+          customerId = retryCustomer.id as string
+        } else if (retryErr?.code === '23505') {
+          const { data: existing } = await adminClient()
+            .from('customers')
+            .select('id, name')
+            .eq('phone', normalizedPhone)
+            .maybeSingle()
+          if (existing) {
+            customerId = existing.id as string
+            autoLinkedCustomer = existing.name as string
+          }
+        } else if (retryErr) {
+          console.error('[Phone order] Customer create error (retry):', retryErr)
         }
       } else {
         console.error('[Phone order] Customer create error:', custErr)
@@ -122,34 +149,46 @@ export async function POST(request: NextRequest) {
 
   const orderNumber = generateOrderNumber(config.business_name)
 
-  const { data: order, error: orderErr } = await adminClient()
+  const baseOrderPayload = {
+    order_number: orderNumber,
+    customer_id: customerId ?? null,
+    order_type: input.order_type,
+    status: 'accepted',
+    status_history: [{ status: 'accepted', timestamp: now }],
+    delivery_address: input.delivery_address ?? null,
+    delivery_city: input.delivery_city ?? null,
+    delivery_postal_code: input.delivery_postal_code ?? null,
+    delivery_notes: input.delivery_notes ?? null,
+    delivery_fee: input.delivery_fee,
+    estimated_delivery_at: estimatedDeliveryAt,
+    subtotal,
+    total,
+    payment_method: input.payment_method,
+    payment_status: 'pending',
+    customer_name: input.customer_name,
+    customer_phone: input.customer_phone,
+    customer_email: input.customer_email ?? null,
+    customer_notes: input.customer_notes ?? null,
+    placed_at: now,
+    accepted_at: now,
+  }
+
+  // Try order insert with source; fall back if migration 05 not applied
+  let orderResult = await adminClient()
     .from('orders')
-    .insert({
-      order_number: orderNumber,
-      customer_id: customerId ?? null,
-      order_type: input.order_type,
-      status: 'accepted',
-      source: 'phone',
-      status_history: [{ status: 'accepted', timestamp: now }],
-      delivery_address: input.delivery_address ?? null,
-      delivery_city: input.delivery_city ?? null,
-      delivery_postal_code: input.delivery_postal_code ?? null,
-      delivery_notes: input.delivery_notes ?? null,
-      delivery_fee: input.delivery_fee,
-      estimated_delivery_at: estimatedDeliveryAt,
-      subtotal,
-      total,
-      payment_method: input.payment_method,
-      payment_status: 'pending',
-      customer_name: input.customer_name,
-      customer_phone: input.customer_phone,
-      customer_email: input.customer_email ?? null,
-      customer_notes: input.customer_notes ?? null,
-      placed_at: now,
-      accepted_at: now,
-    })
+    .insert({ ...baseOrderPayload, source: 'phone' })
     .select('*')
     .single()
+
+  if (isSchemaCacheError(orderResult.error)) {
+    orderResult = await adminClient()
+      .from('orders')
+      .insert(baseOrderPayload)
+      .select('*')
+      .single()
+  }
+
+  const { data: order, error: orderErr } = orderResult
 
   if (orderErr || !order) {
     return NextResponse.json({ error: orderErr?.message ?? 'Failed to create order' }, { status: 500 })
@@ -188,16 +227,19 @@ export async function POST(request: NextRequest) {
     )
       .then(async ({ data: cust }) => {
         if (!cust) return
-        await adminClient()
+        const baseUpdate = {
+          order_count: ((cust.order_count as number) ?? 0) + 1,
+          total_spent: ((cust.total_spent as number) ?? 0) + total,
+          updated_at: now,
+        }
+        const { error: updateErr } = await adminClient()
           .from('customers')
-          .update({
-            order_count: ((cust.order_count as number) ?? 0) + 1,
-            total_spent: ((cust.total_spent as number) ?? 0) + total,
-            last_order_at: now,
-            preferred_payment_method: input.payment_method,
-            updated_at: now,
-          })
+          .update({ ...baseUpdate, last_order_at: now, preferred_payment_method: input.payment_method })
           .eq('id', cid)
+        // Migration 04 not applied — retry with base columns only
+        if (isSchemaCacheError(updateErr)) {
+          await adminClient().from('customers').update(baseUpdate).eq('id', cid)
+        }
       })
       .catch(console.error)
   }
